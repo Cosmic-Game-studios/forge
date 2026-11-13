@@ -1,4 +1,6 @@
 import path from "node:path";
+import type { Job, Jobs } from "../jobs.ts";
+import type { Team } from "../team.ts";
 import type { ContentBlock, ToolSpec } from "../providers/types.ts";
 
 export interface TodoItem {
@@ -24,6 +26,15 @@ export interface ToolContext {
   lintOff?: Set<string>;
   /** Run a sub-agent with a fresh context; returns its final report. */
   runSubagent(prompt: string, description: string): Promise<string>;
+  /** Background jobs of the main agent (absent for sub-agents). */
+  jobs?: Jobs;
+  /** The team this agent belongs to, and its id in it ("main", "ag2"). */
+  team?: Team;
+  agentId?: string;
+  /** Ask the advisor model for help (main agent only, when the advisor is on). */
+  consult?(question: string): Promise<string>;
+  /** Start a sub-agent as a background job (main agent only). */
+  startSubagent?(prompt: string, description: string): Job;
   /** Live progress line for long-running tools. */
   progress(text: string): void;
 }

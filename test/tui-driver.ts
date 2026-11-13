@@ -31,7 +31,7 @@ process.env.FORGE_ANTHROPIC_BASE_URL = mock.url;
 process.env.FORGE_HOME = fs.mkdtempSync(path.join(os.tmpdir(), "forge-tui-home-"));
 process.env.ANTHROPIC_API_KEY = "test-key";
 // The script above counts model requests; request preparation would add one.
-fs.writeFileSync(path.join(process.env.FORGE_HOME, "config.json"), JSON.stringify({ prepare: false, watch: false }));
+fs.writeFileSync(path.join(process.env.FORGE_HOME, "config.json"), JSON.stringify({ prepare: false, watch: false, visibleRequests: Number(process.env.FORGE_TUI_VIEW ?? 0) }));
 const cwd = fs.mkdtempSync(path.join(os.tmpdir(), "forge-tui-proj-"));
 process.chdir(cwd);
 

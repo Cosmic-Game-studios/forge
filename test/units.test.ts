@@ -210,3 +210,10 @@ test("OpenAI-compatible wire translation", () => {
   assert.equal(wire[3].content, "ERROR: 1\tx");
   assert.ok(!JSON.stringify(wire).includes("secret"), "thinking never leaves the Anthropic path");
 });
+
+test("thinking titles: bold headings first, else the first sentence", async () => {
+  const { thinkingHeadlines } = await import("../src/ui/app.ts");
+  assert.deepEqual(thinkingHeadlines("**Reading the route**\n\nIt has no limiter.\n\n**Planning the change**\n\nOne limiter."), ["Reading the route", "Planning the change"]);
+  assert.deepEqual(thinkingHeadlines("The user wants a file. I will write it."), ["The user wants a file."]);
+  assert.deepEqual(thinkingHeadlines(""), []);
+});

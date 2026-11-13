@@ -9,6 +9,12 @@
 
 import { cheapModel, COMPACT_SYSTEM, compactPrompt, renderTranscript, stripThinking, SUMMARY_MARK, tailStart } from "./compact.ts";
 import { getKey, saveConfig, type Config, type Effort, type PermissionMode } from "./config.ts";
+import { Jobs, type Job } from "./jobs.ts";
+import { ADVISOR_SYSTEM, advisorPrompt } from "./advisor.ts";
+import { discuss, leadNote, partnerBrief, type Ask, type Discussion } from "./pair.ts";
+import { formatMail, Team, type TeamMessage } from "./team.ts";
+import { describeJob } from "./tools/shell.ts";
+import { stripAnsi } from "./ui/term.ts";
 import { loadMcpConfig, McpManager, serverFingerprint, type McpServerConfig } from "./mcp.ts";
 import { formatModelRef, modelInfo, parseModelRef, type ModelRef } from "./models.ts";
 import { buildSystemPrompt } from "./prompt.ts";
@@ -77,6 +83,14 @@ export interface AgentUI {
   onServerTool(name: string, detail: string): void;
   onNotice(msg: string, level?: "info" | "warn" | "error"): void;
   onStats(stats: Stats): void;
+  /** A background job started, changed or ended. */
+  onJobs?(): void;
+  /** One agent sent another (or all) a message. */
+  onMessage?(m: TeamMessage): void;
+  /** Pair mode: one statement in the discussion before the work starts. */
+  onPairTurn?(who: string, phase: Discussion["turns"][number]["phase"], text: string): void;
+  /** Pair mode: the partner finished a tool call. */
+  onPartnerTool?(job: Job, call: ToolCall, summary: string, out: ToolOutput, ms: number): void;
   askPermission(req: PermissionRequest): Promise<PermissionAnswer>;
 }
 
@@ -88,6 +102,8 @@ interface LoopState {
   ctx: ToolContext;
   depth: number;
   effort: Effort;
+  /** Set for a sub-agent that runs as a background job: its steps are counted there instead of shown. */
+  job?: Job;
 }
 
 const BASELINE = process.env.FORGE_BASELINE === "1";
@@ -128,6 +144,10 @@ export class Agent {
   /** Messages the user typed while the agent was working; delivered at the next tool boundary. */
   steering: string[] = [];
   busy = false;
+  /** Background commands and sub-agents. */
+  jobs = new Jobs();
+  /** The main agent and its sub-agents: mailboxes and the shared board. */
+  team = new Team(() => ["main", ...this.jobs.running("agent").map((j) => j.id)]);
 
   private tools = buildTools({ subagent: false });
   private ctx: ToolContext;
@@ -150,6 +170,8 @@ export class Agent {
   private reviewOutcome: string | null = null;
   /** Summary of the request that finished last. */
   lastRun: RunSummary | null = null;
+  /** Advisor calls in the current request. */
+  private advisorCalls = 0;
   /** One entry per request that changed files: what they contained before it. Newest last. */
   private checkpoints: { label: string; files: Map<string, string | null> }[] = [];
   /** Something the model must be told with the next request (for example, that the user undid its changes). */
@@ -178,6 +200,17 @@ export class Agent {
       title: "",
     };
     this.ctx = this.makeContext(opts.cwd, new AbortController().signal);
+    this.ctx.jobs = this.jobs;
+    this.ctx.team = this.team;
+    this.ctx.agentId = "main";
+    this.team.onMessage = (m) => this.ui.onMessage?.(m);
+    this.jobs.onChange = (job) => {
+      // A command that ends between requests is worth a word; during one the model is told.
+      if (job.status !== "running" && job.kind === "shell" && !this.busy && !job.reported) {
+        this.ui.onNotice(`Background command ${job.id} ended: ${job.status}${job.exitCode != null ? `, exit code ${job.exitCode}` : ""}.`, job.status === "failed" ? "warn" : "info");
+      }
+      this.ui.onJobs?.();
+    };
     this.stats = { total: { ...ZERO_USAGE }, cost: 0, contextTokens: 0, contextLimit: modelInfo(this.model).context };
   }
 
@@ -222,7 +255,85 @@ export class Agent {
   }
 
   close() {
+    this.jobs.stopAll();
     this.mcp.close();
+  }
+
+  /**
+   * Finished background jobs the model has not heard about, as one message.
+   * A sub-agent's report is included; a command brings its latest output.
+   */
+  private jobNote(): string {
+    const parts: string[] = [];
+    for (const job of this.jobs.unreported()) {
+      job.reported = true;
+      if (job.kind === "agent") {
+        parts.push(`[Forge: background ${describeJob(job)}. Its report:]\n${job.output || "(no report)"}`);
+      } else {
+        const fresh = job.output.slice(job.readPos).replace(/\s+$/, "");
+        job.readPos = job.output.length;
+        parts.push(`[Forge: background ${describeJob(job)}.${fresh ? ` Output you have not seen yet (end):]\n${fresh.slice(-3000)}` : "]"}`);
+      }
+    }
+    return parts.join("\n\n");
+  }
+
+  /**
+   * Start a sub-agent as a job with its own id, so it can talk to the main
+   * agent and to the other sub-agents. In the background it runs alongside the
+   * main agent; in the foreground the main agent waits for its report. Esc stops
+   * it along with the request that started it.
+   */
+  private startSubagent(
+    parent: LoopState,
+    prompt: string,
+    description: string,
+    background: boolean,
+    opts: { model?: ModelRef; system?: string; partner?: string; effort?: Effort } = {},
+  ): Job {
+    const ac = new AbortController();
+    const parentSignal = parent.ctx.signal;
+    const onAbort = () => ac.abort();
+    parentSignal.addEventListener("abort", onAbort, { once: true });
+    return this.jobs.add("agent", description, (job) => ({
+      stop: () => ac.abort(),
+      done: (async () => {
+        try {
+          const ctx = this.makeContext(parent.ctx.cwd, ac.signal);
+          ctx.team = this.team;
+          ctx.agentId = job.id;
+          job.partner = opts.partner;
+          job.output = await this.loop({
+            model: opts.model ?? this.subagentModel(parent.model),
+            system: opts.system ?? buildSystemPrompt(parent.ctx.cwd, { subagent: true }),
+            messages: [{ role: "user", content: `${prompt}\n\n${this.teamBrief(job)}` }],
+            tools: buildTools({ subagent: true }),
+            ctx,
+            depth: parent.depth + 1,
+            effort: opts.effort ?? (this.effort === "low" ? "low" : "medium"),
+            job,
+          });
+          if (ac.signal.aborted && job.status === "running") job.status = "stopped";
+        } catch (err) {
+          job.output = `The sub-agent failed: ${(err as Error).message}`;
+          job.status = "failed";
+        } finally {
+          parentSignal.removeEventListener("abort", onAbort);
+        }
+      })(),
+    }), background);
+  }
+
+  /** Who else is working, and what has been shared so far: the end of every sub-agent's brief. */
+  private teamBrief(job: Job): string {
+    const others = this.jobs.running("agent").filter((j) => j.id !== job.id);
+    const shared = this.team.shared();
+    return [
+      `# Your team\n\nYou are sub-agent ${job.id}. The main agent (\`main\`) gave you this task${job.background ? " and keeps working while you do" : " and waits for your report"}.${others.length ? ` Other sub-agents working right now: ${others.map((j) => `${j.id} ("${j.label}")`).join(", ")}.` : ""} Use the message tool to share a finding the others need (\`to: "all"\`), to coordinate so no work is done twice, or to ask when you are truly blocked. Messages to you arrive with your next step. Your final reply is still your report.`,
+      shared ? `# Shared by the team so far\n\n${shared}` : "",
+    ]
+      .filter(Boolean)
+      .join("\n\n");
   }
 
   /** Start a fresh conversation in the same project. */
@@ -238,6 +349,8 @@ export class Agent {
       updated: now,
       title: "",
     };
+    this.jobs.stopAll("agent");
+    this.team.clear();
     this.ctx.todos.length = 0;
     this.ctx.fileState.clear();
     this.ctx.readSeen.clear();
@@ -285,7 +398,105 @@ export class Agent {
   }
 
   private toolSpecs(tools: Map<string, Tool>): ToolSpec[] {
-    return [...tools.values()].map((t) => t.spec);
+    // The advisor is offered only when it is switched on and stronger than the working model.
+    const advisor = this.advisorModel();
+    return [...tools.values()].filter((t) => t.spec.name !== "advisor" || advisor).map((t) => t.spec);
+  }
+
+  /** The pair partner's model, or null when pair mode is off, has no key, or is the model already working. */
+  pairModel(): ModelRef | null {
+    const ref = this.cfg.pair ? parseModelRef(this.cfg.pair) : null;
+    if (!ref || !getKey(this.cfg, ref.provider)) return null;
+    if (formatModelRef(ref) === formatModelRef(this.model)) return null;
+    return ref;
+  }
+
+  /**
+   * Pair mode, before the work: both models propose, critique each other and
+   * agree on a plan with the work split in two; then the partner starts on its
+   * part while the lead (the main model) does the other.
+   */
+  private async pairUp(st: LoopState, task: string, context: string) {
+    const partnerModel = this.pairModel()!;
+    const lead = { name: modelInfo(st.model).name };
+    const partner = { name: modelInfo(partnerModel).name };
+    const signal = st.ctx.signal;
+    this.ui.onNotice(`Pair mode: ${lead.name} and ${partner.name} discuss the approach before they start.`);
+    const ask: Ask = async (side, system, prompt) => {
+      const model = side === "lead" ? st.model : partnerModel;
+      const result = await getProvider(this.cfg, model.provider).runTurn(
+        { model: model.id, system, messages: [{ role: "user", content: prompt }], tools: [], effort: "medium", maxTokens: 8_000, webTools: false, signal },
+        NO_HANDLERS,
+      );
+      this.track(model, result.usage, false);
+      const text = result.content
+        .filter((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text")
+        .map((b) => b.text)
+        .join("")
+        .trim();
+      return text || "(no answer)";
+    };
+    let talk: Discussion;
+    try {
+      const shown = { lead: lead.name, partner: partner.name };
+      talk = await discuss(ask, task, context, lead, partner, this.cfg.pairRounds ?? 1, (t) => this.ui.onPairTurn?.(shown[t.side], t.phase, t.text));
+    } catch (err) {
+      if (signal.aborted) return;
+      this.ui.onNotice(`Pair mode: the discussion failed (${(err as Error).message}); ${lead.name} works alone on this request.`, "warn");
+      return;
+    }
+    if (signal.aborted) return;
+    const job = this.startSubagent(st, partnerBrief(task, talk.plan, lead, partner), `pair partner · ${partner.name}`, true, {
+      model: partnerModel,
+      partner: partner.name,
+      effort: this.effort,
+    });
+    const last = st.messages[st.messages.length - 1];
+    const note = leadNote(talk.plan, lead, partner, job.id);
+    if (last?.role === "user" && typeof last.content === "string") last.content += `\n\n${note}`;
+    else st.messages.push({ role: "user", content: note });
+  }
+
+  /** The advisor model, or null when it is off, has no key, or is the model already working. */
+  advisorModel(): ModelRef | null {
+    const ref = this.cfg.advisor ? parseModelRef(this.cfg.advisor) : null;
+    if (!ref || !getKey(this.cfg, ref.provider)) return null;
+    if (formatModelRef(ref) === formatModelRef(this.model)) return null;
+    return ref;
+  }
+
+  /** Ask the advisor: one request, no tools, with a condensed record of the conversation. */
+  private async consult(st: LoopState, question: string): Promise<string> {
+    const model = this.advisorModel();
+    if (!model) throw new Error("The advisor is switched off.");
+    const limit = this.cfg.advisorLimit ?? 3;
+    if (this.advisorCalls >= limit) {
+      return `The advisor has already been asked ${limit} time${limit === 1 ? "" : "s"} in this request, the limit. Go on with what you know, or tell the user what is blocking you.`;
+    }
+    this.advisorCalls++;
+    const info = modelInfo(model);
+    this.ui.onNotice(`Asking ${info.name} for advice (${this.advisorCalls}/${limit} this request) - an expensive request.`, "warn");
+    const transcript = renderTranscript(st.messages, 120_000);
+    const result = await getProvider(this.cfg, model.provider).runTurn(
+      {
+        model: model.id,
+        system: ADVISOR_SYSTEM,
+        messages: [{ role: "user", content: advisorPrompt(question, transcript, modelInfo(st.model).name) }],
+        tools: [],
+        effort: "high",
+        maxTokens: 16_000,
+        webTools: false,
+        signal: st.ctx.signal,
+      },
+      NO_HANDLERS,
+    );
+    this.track(model, result.usage, false);
+    const text = result.content
+      .filter((b): b is Extract<ContentBlock, { type: "text" }> => b.type === "text")
+      .map((b) => b.text)
+      .join("")
+      .trim();
+    return text ? `Advice from ${info.name}:\n\n${text}` : "The advisor returned no answer.";
   }
 
   /** Run one user request to completion. */
@@ -295,10 +506,12 @@ export class Agent {
     this.abort = new AbortController();
     this.ctx.signal = this.abort.signal;
     if (!this.session.title) this.session.title = input.replace(/\s+/g, " ").slice(0, 80);
-    const context = [this.pendingNote, await this.prepare(input).catch(() => "")].filter(Boolean).join("\n\n");
+    const mail = this.team.take("main");
+    const context = [this.pendingNote, this.jobNote(), mail.length ? formatMail(mail) : "", await this.prepare(input).catch(() => "")].filter(Boolean).join("\n\n");
     this.pendingNote = "";
     this.session.messages.push({ role: "user", content: context ? `${input}\n\n${context}` : input });
     this.repeats.clear();
+    this.advisorCalls = 0;
     this.before.clear();
     this.watchBase.clear();
     this.watchFindings = null;
@@ -313,6 +526,7 @@ export class Agent {
     // A question needs an answer, not the deepest thinking the session allows.
     if (this.triage?.kind === "question" && ["high", "xhigh", "max"].includes(state.effort)) state.effort = "medium";
     try {
+      if (this.pairModel()) await this.pairUp(state, input, context);
       await this.loop(state);
       // The watcher may still be reading the last edits; what it found is settled before "done".
       if (this.watchRun) {
@@ -627,6 +841,28 @@ export class Agent {
           continue;
         }
         if (result.stop === "other" && result.stopDetail) this.ui.onNotice(`The model stopped: ${result.stopDetail}`, "warn");
+        if (main && !signal.aborted) {
+          const working = this.jobs.running("agent");
+          if (working.length && !this.team.has("main")) {
+            this.ui.onNotice(`Waiting for ${working.length} background sub-agent${working.length === 1 ? "" : "s"} to report…`);
+            // Wake for a finished sub-agent or a message from one, whichever comes first.
+            const woke = new AbortController();
+            const either = AbortSignal.any([signal, woke.signal]);
+            await Promise.race([this.jobs.waitAny(working, 30 * 60_000, either), this.team.waitFor("main", 30 * 60_000, either)]);
+            woke.abort();
+          }
+          const note = signal.aborted ? "" : [this.jobNote(), this.takeMail(st)].filter(Boolean).join("\n\n");
+          if (note) {
+            st.messages.push({ role: "user", content: note });
+            continue;
+          }
+        } else if (!main && !signal.aborted) {
+          const mail = this.takeMail(st);
+          if (mail) {
+            st.messages.push({ role: "user", content: `${mail}\n\nDeal with this, then end with your report as before.` });
+            continue;
+          }
+        }
         return finalText;
       }
 
@@ -648,6 +884,12 @@ export class Agent {
         if (this.watchFindings) content.push({ type: "text", text: this.takeWatchNote() });
         this.maybeWatch(st);
       }
+      if (main) {
+        const note = this.jobNote();
+        if (note) content.push({ type: "text", text: note });
+      }
+      const mail = this.takeMail(st);
+      if (mail) content.push({ type: "text", text: mail });
       if (main && this.steering.length) {
         for (const msg of this.steering.splice(0)) {
           content.push({ type: "text", text: `[The user sent this message while you were working]\n${msg}` });
@@ -659,6 +901,14 @@ export class Agent {
         await this.maybeAutoCompact(true);
       }
     }
+  }
+
+  /** Messages waiting for the agent of this loop, as text for its next turn. */
+  private takeMail(st: LoopState): string {
+    const id = st.ctx.agentId;
+    if (!id || !st.ctx.team) return "";
+    const mail = st.ctx.team.take(id);
+    return mail.length ? formatMail(mail) : "";
   }
 
   /** Run the project's checks after a turn that changed files. Returns the failures, or null when there is nothing to fix. */
@@ -732,9 +982,10 @@ export class Agent {
 
     const denied = await this.checkPermission(st, tool, call, summary);
     if (denied !== null) {
-      this.ui.onToolStart(call, summary, st.depth);
-      const out: ToolOutput = { content: denied, isError: true, display: ["declined"] };
-      this.ui.onToolEnd(call, out, 0, st.depth);
+      if (!st.job?.background) {
+        this.ui.onToolStart(call, summary, st.depth);
+        this.ui.onToolEnd(call, { content: denied, isError: true, display: ["declined"] }, 0, st.depth);
+      }
       return fail(denied);
     }
 
@@ -754,13 +1005,20 @@ export class Agent {
         if (!this.watchBase.has(file)) this.watchBase.set(file, old);
       }
     }
-    this.ui.onToolStart(call, summary, st.depth);
+    if (st.job) {
+      st.job.calls++;
+      st.job.activity = `${call.name} ${stripAnsi(summary)}`.trim();
+      this.ui.onJobs?.();
+    }
+    if (!st.job?.background) this.ui.onToolStart(call, summary, st.depth);
     const started = Date.now();
     // Each call gets its own view of the context so progress lines and
     // sub-agents are attributed to the right call.
     const ctx: ToolContext = Object.create(st.ctx, {
-      progress: { value: (t: string) => this.ui.onToolLive(call.id, t) },
+      progress: { value: (t: string) => (st.job?.background ? undefined : this.ui.onToolLive(call.id, t)) },
       runSubagent: { value: (prompt: string, desc: string) => this.runSubagent(st, call, prompt, desc) },
+      startSubagent: { value: st.depth === 0 ? (prompt: string, desc: string) => this.startSubagent(st, prompt, desc, true) : undefined },
+      consult: { value: st.depth === 0 ? (q: string) => this.consult(st, q) : undefined },
     });
     let out: ToolOutput;
     try {
@@ -769,7 +1027,8 @@ export class Agent {
     } catch (err) {
       out = { content: `Tool \`${call.name}\` failed: ${(err as Error).message}`, isError: true };
     }
-    this.ui.onToolEnd(call, out, Date.now() - started, st.depth);
+    if (!st.job?.background) this.ui.onToolEnd(call, out, Date.now() - started, st.depth);
+    else if (st.job.partner) this.ui.onPartnerTool?.(st.job, call, summary, out, Date.now() - started);
     if (!out.isError) {
       if (tool.kind === "edit") this.dirty = true;
       else if (call.name === "check" || (call.name === "bash" && VERIFY_COMMAND.test(String(call.input.command ?? "")))) {
@@ -881,21 +1140,12 @@ export class Agent {
   }
 
   private async runSubagent(parent: LoopState, call: ToolCall, prompt: string, description: string): Promise<string> {
-    const model = this.subagentModel(parent.model);
-    const ctx = this.makeContext(parent.ctx.cwd, parent.ctx.signal);
-    const messages: Message[] = [{ role: "user", content: prompt }];
     this.ui.onToolLive(call.id, `${description}: starting`);
-    const report = await this.loop({
-      model,
-      system: buildSystemPrompt(parent.ctx.cwd, { subagent: true }),
-      messages,
-      tools: buildTools({ subagent: true }),
-      ctx,
-      depth: parent.depth + 1,
-      // Sub-agents search and read; they do not need the main agent's thinking depth.
-      effort: this.effort === "low" ? "low" : "medium",
-    });
-    return report;
+    const job = this.startSubagent(parent, prompt, description, false);
+    await job.done;
+    job.reported = true; // the report is this tool call's result
+    if (job.status === "failed") throw new Error(job.output);
+    return job.output;
   }
 
   /**

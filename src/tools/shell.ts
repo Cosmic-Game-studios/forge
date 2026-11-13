@@ -5,8 +5,9 @@ import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { c, stripAnsi } from "../ui/term.ts";
-import { clip, type Tool } from "./types.ts";
+import { jobAge, type Job, type Jobs } from "../jobs.ts";
+import { c, stripAnsi, formatDuration } from "../ui/term.ts";
+import { clip, type Tool, type ToolContext } from "./types.ts";
 
 export interface ShellInfo {
   kind: "bash" | "powershell";
@@ -100,22 +101,27 @@ export const shellTool: Tool = {
   spec: {
     name: "bash",
     description:
-      "Run a shell command and return its combined stdout/stderr and exit code. The working directory persists between calls; other shell state (variables, functions) does not. Commands run non-interactively with no stdin, so pass flags that avoid prompts (`-y`, `--no-edit`, ...) and never start an editor or pager. Use this for builds, tests, git, package managers and anything without a dedicated tool. Prefer the read/edit/glob/grep tools for file work: they are faster and their results are easier for the user to review. Default timeout is 120 s (max 600 s); for servers or watchers that never exit, start them in the background (`cmd > log 2>&1 &`) and inspect the log.",
+      "Run a shell command and return its combined stdout/stderr and exit code. The working directory persists between calls; other shell state (variables, functions) does not. Commands run non-interactively with no stdin, so pass flags that avoid prompts (`-y`, `--no-edit`, ...) and never start an editor or pager. Use this for builds, tests, git, package managers and anything without a dedicated tool. Prefer the read/edit/glob/grep tools for file work: they are faster and their results are easier for the user to review. Default timeout is 120 s (max 600 s). For servers, watchers and long builds set `background: true`: the command keeps running, you get its id and first output after a few seconds, and you can read more output or stop it with the `jobs` tool while you go on working. Forge tells you when a background command exits. Do not use `&` or `nohup` for this.",
     input_schema: {
       type: "object",
       properties: {
         command: { type: "string", description: "The command line to run." },
         timeout: { type: "integer", description: "Timeout in seconds (default 120, max 600)." },
         description: { type: "string", description: "A few words on what this command does, shown to the user." },
+        background: { type: "boolean", description: "Keep the command running in the background and return at once with its job id." },
       },
       required: ["command"],
     },
   },
   summarize: (i) => {
     const cmd = String(i.command ?? "").split("\n");
-    return cmd[0] + (cmd.length > 1 ? c.dim(` … (+${cmd.length - 1} lines)`) : "");
+    return cmd[0] + (cmd.length > 1 ? c.dim(` … (+${cmd.length - 1} lines)`) : "") + (i.background ? c.dim(" (background)") : "");
   },
   async run(input, ctx) {
+    if (input.background) {
+      if (!ctx.jobs) return { content: "Background commands are not available here; run the command normally.", isError: true };
+      return startBackground(String(input.command), ctx, ctx.jobs, input.description ? String(input.description) : "");
+    }
     const shell = detectShell();
     const timeoutMs = Math.min(600, Math.max(1, Number(input.timeout) || 120)) * 1000;
     const { file, args } = wrapCommand(shell, String(input.command));
@@ -219,6 +225,72 @@ export const shellTool: Tool = {
     });
   },
 };
+
+/** How long a new background command is watched before the tool returns. */
+const BACKGROUND_PEEK_MS = 3000;
+
+/** Start a command that keeps running; the tool returns after a short look at its first output. */
+async function startBackground(command: string, ctx: ToolContext, jobs: Jobs, description: string) {
+  const shell = detectShell();
+  const { file, args } = wrapCommand(shell, command);
+  const pidFile = path.join(os.tmpdir(), `forge-${process.pid}-${++callCounter}.pid`).split(path.sep).join("/");
+  let child: ReturnType<typeof spawn>;
+  try {
+    child = spawn(file, args, {
+      cwd: ctx.cwd,
+      windowsHide: true,
+      detached: process.platform !== "win32",
+      stdio: ["ignore", "pipe", "pipe"],
+      env: { ...process.env, CI: process.env.CI ?? "1", GIT_PAGER: "cat", PAGER: "cat", GIT_TERMINAL_PROMPT: "0", FORGE_PIDFILE: pidFile },
+    });
+  } catch (err) {
+    return { content: `Could not start the shell (${file}): ${(err as Error).message}`, isError: true };
+  }
+  const job = jobs.add("shell", description || command.split("\n")[0], (j) => ({
+    stop: () => {
+      if (child.pid) killTree(child.pid, shell, pidFile);
+    },
+    done: new Promise<void>((resolve) => {
+      const onData = (d: Buffer) => jobs.append(j, stripAnsi(d.toString("utf8")).replace(/\r\n/g, "\n"));
+      child.stdout!.on("data", onData);
+      child.stderr!.on("data", onData);
+      child.on("error", (err) => {
+        jobs.append(j, `\nCould not run the command: ${err.message}\n`);
+        j.status = "failed";
+        resolve();
+      });
+      child.on("close", (code) => {
+        // The working-directory marker is bookkeeping, not output.
+        const mark = j.output.lastIndexOf(CWD_MARK);
+        if (mark !== -1) j.output = j.output.slice(0, mark).replace(/\n$/, "");
+        j.exitCode = code;
+        if (j.status === "running") j.status = code === 0 ? "done" : "failed";
+        fs.rm(pidFile, { force: true }, () => {});
+        resolve();
+      });
+    }),
+  }));
+  // A server prints its address, a build its first error: worth waiting a moment for.
+  await jobs.waitAny([job], BACKGROUND_PEEK_MS, ctx.signal);
+  const first = job.output.replace(/\s+$/, "");
+  job.readPos = job.output.length;
+  const state = job.status === "running" ? `is running in the background as job ${job.id}` : `already ended (${job.status}, exit code ${job.exitCode ?? "none"})`;
+  if (job.status !== "running") job.reported = true;
+  const lines = first ? first.split("\n") : [];
+  return {
+    content: `The command ${state}.${first ? `\nOutput so far:\n${clip(first, 8000)}` : " No output yet."}${job.status === "running" ? `\nRead more with jobs {action: "output", id: "${job.id}"}; stop it with jobs {action: "stop", id: "${job.id}"}. You will be told when it exits.` : ""}`,
+    isError: job.status === "failed",
+    display: [c.dim(job.status === "running" ? `running in the background as ${job.id}` : `ended: ${job.status}`), ...lines.slice(-3).map((l) => c.dim(l))],
+  };
+}
+
+/** One line per job for the model. */
+export function describeJob(job: Job): string {
+  const age = formatDuration(jobAge(job));
+  const what = job.kind === "shell" ? `command \`${job.label}\`` : `sub-agent "${job.label}"`;
+  const state = job.status === "running" ? `running for ${age}` : `${job.status} after ${age}${job.kind === "shell" && job.exitCode != null ? `, exit code ${job.exitCode}` : ""}`;
+  return `${job.id}: ${what}, ${state}${job.kind === "agent" ? `, ${job.calls} tool calls` : ""}`;
+}
 
 // Commands that only read state. They run without a permission prompt when the
 // command line contains no chaining, redirection or substitution.

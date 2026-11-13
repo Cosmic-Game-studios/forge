@@ -114,6 +114,27 @@ export class Screen {
     this.frames++;
   }
 
+  /**
+   * Replace the screen and the terminal's scrollback with these lines; the live
+   * region is painted below them. Lines committed but not yet flushed are
+   * dropped: the caller's lines are meant to include them.
+   */
+  reset(lines: string[]) {
+    if (this.closed) return;
+    if (this.timer) {
+      clearTimeout(this.timer);
+      this.timer = null;
+    }
+    this.pending = [];
+    const body = lines.flatMap((l) => l.split(/\r?\n/)).join("\r\n");
+    // Clear the visible screen and the scrollback, then start at the top.
+    this.out.write(SYNC_START + "\x1b[H\x1b[2J\x1b[3J" + body + (lines.length ? "\r\n" : "") + SYNC_END);
+    this.cursorRow = 0;
+    this.liveRows = 0;
+    this.lastFrame = "";
+    this.paint();
+  }
+
   /** Erase the live region and stop painting; scrollback stays. */
   close() {
     if (this.closed) return;

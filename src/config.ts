@@ -21,6 +21,20 @@ export interface Config {
   permissionMode: PermissionMode;
   /** Model for sub-agents: "provider:id", "same", or unset for the automatic cheap default. */
   subagentModel?: string;
+  /**
+   * A stronger, much more expensive model the working model may ask for help
+   * on hard problems ("provider:id"). Unset: off, the default.
+   */
+  advisor?: string;
+  /** How often the advisor may be asked per request. Default 3. */
+  advisorLimit?: number;
+  /**
+   * Pair mode: a second, different model ("provider:id") that works on every
+   * request together with the main model. Unset: off, the default.
+   */
+  pair?: string;
+  /** Critique rounds in the pair's discussion before the plan. Default 1. */
+  pairRounds?: number;
   /** Spending limit per session in USD; the agent stops when it is reached. */
   budget?: number;
   /** Prepare each request: project snapshot, located mentions, task triage. Default on. */
@@ -31,6 +45,8 @@ export interface Config {
   review?: boolean;
   /** Run the project's checks automatically when a turn that changed files ends. Default on. */
   autoCheck?: boolean;
+  /** How many requests stay on screen; older ones are cleared away (0 keeps everything). Default 5. */
+  visibleRequests?: number;
   /** Compress the conversation once it exceeds this many tokens. Default 120000. */
   compactAt?: number;
   /** Project MCP servers the user approved (see mcp.ts serverFingerprint). */
