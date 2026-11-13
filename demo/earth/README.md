@@ -4,7 +4,9 @@ An interactive 3D Earth in the browser: day and night sides with city lights, a 
 
 Forge built this running Claude Fable 5.2. The files are as the agent left them (the on-screen texts are German, the language of the request). While building, Forge inspected the scene with its `scene3d` and `screenshot` tools, and its independent reviewer caught black streaks on steep mountain slopes, which the agent then fixed.
 
-## Run it
+**Live:** <https://cosmic-game-studios.github.io/forge/demo/earth/earth.html>
+
+## Run it locally
 
 Browsers do not load ES modules from disk, so serve the folder:
 

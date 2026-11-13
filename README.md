@@ -51,12 +51,12 @@
 ## Demo: an Earth built by Forge
 
 <p align="center">
-  <a href="demo/earth"><img src="assets/demo-earth.png" alt="Interactive 3D Earth with clouds, atmosphere and city lights, built by Forge" width="100%"></a>
+  <a href="https://cosmic-game-studios.github.io/forge/demo/earth/earth.html"><img src="assets/demo-earth.png" alt="Interactive 3D Earth with clouds, atmosphere and city lights, built by Forge" width="100%"></a>
 </p>
 
 An interactive 3D Earth with day and night sides, city lights, clouds, an atmosphere shader and bloom — built by Forge from a chat request. The picture above was taken by Forge's own `screenshot` tool. While building, the agent checked the scene with `scene3d`, and the independent reviewer caught black streaks on steep mountain slopes before the agent called it done.
 
-Code, tests and how to run it: [`demo/earth`](demo/earth).
+**[▶ Open the live demo](https://cosmic-game-studios.github.io/forge/demo/earth/earth.html)** — drag to rotate, scroll to zoom, space to pause. Code and tests: [`demo/earth`](demo/earth).
 
 ## Why Forge
 
