@@ -129,7 +129,7 @@ You watch it live: the discussion appears as `⇄ Opus 5.5 proposes …`, the pa
 - **Peers, not a boss and a helper.** Both propose, both critique, both write code, both review. The lead only breaks ties and writes down the plan.
 - **They keep talking while they work**, through the same message system Forge's sub-agents use, instead of meeting once and then working blind.
 
-**Cost.** Pair mode costs both models' work on every request — the discussion plus a second agent coding. How much depends on the pair you choose: Haiku + Sonnet is cheap, Opus + Fable is not. It has not been benchmarked yet, so whether it is worth the price for your tasks is something to try, not a promise.
+**Cost.** Pair mode is **very expensive**: it costs both models' work on every request — the discussion plus a second agent coding. How much depends on the pair you choose. In our test, a god simulator built by Haiku 5.5 with Fable 5.2 cost about $3 to $4 and met every requirement ([details](#pair-mode-in-practice-a-god-simulator)). When quality matters most, use Opus 5.5 as the lead and Fable 5.2 as the partner.
 
 ### The advisor: a cheap model that may ask an expensive one
 
@@ -222,13 +222,60 @@ forge -p "fix the failing test" --mode auto-edit   # headless, may edit
 
 ## What has been measured
 
-Forge is measured against a plain loop and against Claude Code, with the same model and hidden tests. The numbers so far, all with Claude Haiku 5.5:
+Forge is compared with Claude Code and Codex, and with a plain loop, on the same tasks with the same models. Short version: **on visual and 3D work Forge is clearly ahead with every model we tried; on plain code it is on par; and it costs more.**
+
+### Visual and 3D work: Forge is ahead
+
+We built the same visual tasks in Forge, Claude Code and Codex: a 3D Earth, solar systems, planets, 3D scenes and game prototypes. We tried several models, and the result stayed the same:
+
+- **The same model produces visually better results in Forge** than in Claude Code or Codex, whichever model it is.
+- **Forge understands 3D worlds better.** With `scene3d` and `screenshot` the model reads the real scene and looks at the picture, so it can place, size and light things on purpose instead of guessing.
+- **The models check their own work.** In Forge they go back, look at the result again and fix what is off before calling it done. That is where most of the visual gap comes from.
+- **Stronger models get more out of the harness.** Claude Fable 5.2 works noticeably better with Forge's tools than Claude Haiku 5.5 and gives clearly better-looking results.
+
+The [Earth demo](#demo-an-earth-built-by-forge) is an example of what comes out: a close rebuild of the real Earth with its own rendering, shaders and logic. Its code is in [`demo/earth`](demo/earth).
+
+These results come from our own hands-on comparisons, judged by looking at the results side by side; they are not yet blind-scored like the code results below.
+
+### Pair mode in practice: a god simulator
+
+We asked pair mode, with **Claude Haiku 5.5 as the lead and Claude Fable 5.2 as the partner**, for a god simulator. It met the requirements fully:
+
+- a planet (an Earth) with a small HUD showing how much life there is,
+- three buttons — create life, rain meteorites, make it rain —
+- and a planet that changes with them: meteorites can destroy whole continents.
+
+The request cost **about $3 to $4**. Because the lead was Haiku, the graphics were not top-tier — but still better than Haiku alone in Forge, and much better than the same request in Claude Code.
+
+Pair mode also changes the code itself: with two models discussing, the code and the tests come out in a different style than either model writes alone. It is expensive — really expensive — but worth trying.
+
+### Code
+
+With Claude Haiku 5.5 and hidden tests:
 
 - **Hard tasks** (regex engine, JavaScript interpreter, arbitrary-precision decimals, a performance refactor, a bug hunt): Forge and Claude Code both solved about 100 % of the hidden tests on all five. Forge was cheaper and faster on the smaller ones, slower and more expensive on the two largest.
 - **Blind code review** of four of those solutions: Forge 7.0 / 10 on average, Claude Code 6.75 — no real difference.
 - **Easy tasks**: the full harness and a bare loop both passed everything; the harness used about 10 % fewer requests and about 20 % more money.
 
-In plain words: at this point Forge is on par, not ahead. The review pass, the watcher, the instant edit feedback, the 3D tools, pair mode and the advisor were added after these runs and **their effect on quality has not been measured yet**. The review pass alone makes small tasks roughly three to four times slower and more expensive. The benchmark scripts are in [`bench/`](bench) so you can repeat this yourself.
+On plain code Forge is on par, not ahead. The models do choose a different style in Forge: code and tests are written differently than in other harnesses. The review pass, the watcher and the instant edit feedback were added after these runs, and their effect on code quality has not been measured yet. The benchmark scripts are in [`bench/`](bench) so you can repeat this yourself.
+
+### Cost
+
+Forge costs more than other harnesses with the same model. Its loop checks, reviews and looks at the result, and that takes extra model requests; the review pass alone makes small tasks roughly three to four times slower and more expensive. In return the agent makes fewer mistakes, so there is less work left for you to correct.
+
+### Which setup to choose
+
+| Goal | Setup | Cost |
+|---|---|---|
+| **Highest quality** | Pair mode with **Claude Opus 5.5 as the lead** and **Claude Fable 5.2 as the partner** | Very high — the most expensive way to run Forge |
+| **Strong visual results** | Claude Fable 5.2 alone | High |
+| **Save money** | A cheap model such as Claude Haiku 5.5 with the **advisor** (`/advisor`) for the hard parts | Drastically lower |
+
+### Getting the best results: be precise
+
+Forge follows instructions very closely. Its models are built to do exactly what you asked — and nothing more. They do not invent extra features or fill gaps with their own ideas, and they do what they were asked well.
+
+So **describe exactly what you want.** "Make a game" will probably give you a working game, but it will not meet requirements you never wrote down. List the features, the controls, the look and what "done" means, and Forge delivers all of it.
 
 ## Where Forge is going
 
@@ -270,7 +317,7 @@ Claude models are also what Forge itself runs on by default: the main model does
 
 This is an **alpha**. It works, it has 65 tests, and it will change.
 
-- Pair mode, the advisor and background sub-agents are new: they are covered by tests against a scripted API, but have seen little use with real models yet.
+- Pair mode, the advisor and background sub-agents are new. Pair mode has been tried on real projects; the advisor and background sub-agents are so far mainly covered by tests against a scripted API.
 
 - Type feedback covers TypeScript; lint feedback covers ESLint and Ruff. Other languages get the language-independent notes only.
 - `scene3d` understands three.js. Other engines get screenshots.
