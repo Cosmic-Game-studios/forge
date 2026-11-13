@@ -1,0 +1,485 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Forge Pair Mode</title>
+<meta name="description" content="An interactive walk-through of Forge's pair mode: two different models discuss, plan, code together and check each other. Compare it with the advisor.">
+<style>
+  :root {
+    --bg: #0e0f13; --panel: #17161a; --card: #1d1b20; --line: #2a2622; --text: #ece5dc; --dim: #8b8378; --soft: #a39a90;
+    --lead: #ff8a2a; --part: #b48cff; --yellow: #ffd166; --green: #5fd38d; --red: #f0705f;
+    --mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace;
+    --sans: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 var(--sans); }
+  main { max-width: 1180px; margin: 0 auto; padding: 28px 16px 48px; }
+  a { color: var(--yellow); }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h1 span { color: var(--part); }
+  .lede { color: var(--soft); margin: 0 0 22px; max-width: 760px; }
+  .bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 14px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .seg button { border: 0; border-radius: 0; }
+  button, select { font: inherit; font-size: 14px; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 7px 13px; cursor: pointer; }
+  button:hover:not(:disabled), select:hover { border-color: #4a423a; background: #1f1d22; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button:focus-visible, select:focus-visible { outline: 2px solid var(--yellow); outline-offset: 2px; }
+  .seg button[aria-pressed="true"] { background: #2a2230; color: #fff; }
+  .seg button[data-mode="advisor"][aria-pressed="true"] { background: #2b2417; }
+  .primary { background: var(--part); color: #14101c; border-color: var(--part); font-weight: 700; }
+  .primary:hover:not(:disabled) { background: #c4a4ff; border-color: #c4a4ff; }
+  label.pick { display: inline-flex; align-items: center; gap: 6px; color: var(--soft); font-size: 13px; }
+  .spacer { flex: 1; }
+  .warn { color: var(--red); font-size: 13px; min-height: 20px; margin: -4px 0 10px; }
+
+  .phases { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 14px; }
+  .phase { text-align: left; padding: 9px 12px; border-radius: 10px; background: var(--panel); border: 1px solid var(--line); color: var(--dim); transition: all .25s; }
+  .phase b { display: block; color: var(--soft); font-size: 13.5px; }
+  .phase small { font-size: 12px; }
+  .phase.done { color: var(--soft); }
+  .phase.done b { color: var(--text); }
+  .phase.on { border-color: var(--part); background: #1d1825; color: var(--text); box-shadow: 0 0 0 1px var(--part) inset; }
+  .phase.on b { color: #fff; }
+  body.advisor .phase.on { border-color: var(--yellow); background: #211d14; box-shadow: 0 0 0 1px var(--yellow) inset; }
+
+  .stage { position: relative; display: grid; grid-template-columns: 1fr 300px 1fr; gap: 12px; }
+  .lane { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-height: 430px; display: flex; flex-direction: column; transition: opacity .3s, border-color .3s; }
+  .lane.lead { border-top: 3px solid var(--lead); }
+  .lane.part { border-top: 3px solid var(--part); }
+  body.advisor .lane.part { border-top-color: var(--yellow); }
+  .lane.idle { opacity: 0.55; }
+  .who { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  .dot { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #14101c; flex: none; }
+  .lead .dot { background: var(--lead); }
+  .part .dot { background: var(--part); }
+  body.advisor .part .dot { background: var(--yellow); }
+  .who .role { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--dim); text-transform: uppercase; }
+  .who .name { font-weight: 700; font-size: 15.5px; }
+  .who .meta { margin-left: auto; text-align: right; font-size: 12px; color: var(--dim); }
+  .who .meta b { color: var(--text); font-size: 15px; display: block; }
+  .status { font-size: 12.5px; color: var(--dim); min-height: 20px; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
+  .status.busy::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: pulse 1s ease-in-out infinite; }
+  .lead .status.busy { color: var(--lead); }
+  .part .status.busy { color: var(--part); }
+  body.advisor .part .status.busy { color: var(--yellow); }
+  @keyframes pulse { 50% { opacity: .25; } }
+  .feed { display: flex; flex-direction: column; gap: 8px; overflow-y: auto; max-height: 520px; padding-right: 2px; scrollbar-width: thin; scrollbar-color: #3a332c transparent; }
+  .item { border-radius: 10px; padding: 9px 11px; background: var(--card); border: 1px solid var(--line); font-size: 13.5px; animation: in .3s ease-out; }
+  .item .tag { display: block; font-size: 10.5px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; margin-bottom: 2px; }
+  .lead .item .tag { color: var(--lead); }
+  .part .item .tag { color: var(--part); }
+  body.advisor .part .item .tag { color: var(--yellow); }
+  .item.tool { font-family: var(--mono); font-size: 12.5px; background: transparent; border-style: dashed; }
+  .item.tool .ok { color: var(--green); }
+  .item.tool .bad { color: var(--red); }
+  .item.mail { border-color: #4a3f20; background: #1f1b12; }
+  .item.mail .tag { color: var(--yellow) !important; }
+  .item.good { border-color: #2c5a3e; background: #142019; }
+  @keyframes in { from { transform: translateY(6px); box-shadow: 0 0 0 1px #6b5a8a; } to { transform: none; } }
+
+  .mid { display: flex; flex-direction: column; gap: 12px; }
+  .box { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+  .box h2 { font-size: 11px; font-weight: 800; letter-spacing: .09em; text-transform: uppercase; color: var(--dim); margin: 0 0 8px; }
+  .explain { font-size: 14px; color: var(--text); min-height: 110px; }
+  .explain p { margin: 0 0 6px; }
+  .explain .why { color: var(--soft); font-size: 13px; }
+  .plan { font-family: var(--mono); font-size: 12.5px; white-space: pre-wrap; color: var(--soft); min-height: 40px; }
+  .plan .hd { color: var(--yellow); font-weight: 700; }
+  .plan .l { color: var(--lead); } .plan .p { color: var(--part); }
+  .files { list-style: none; margin: 0; padding: 0; font-family: var(--mono); font-size: 12.5px; }
+  .files li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 0; border-bottom: 1px dashed var(--line); animation: in .3s ease-out; }
+  .files li:last-child { border-bottom: 0; }
+  .files .by-l { color: var(--lead); } .files .by-p { color: var(--part); }
+  .empty { color: var(--dim); font-size: 13px; font-style: italic; }
+
+  .flyer { position: absolute; z-index: 5; pointer-events: none; padding: 5px 11px; border-radius: 999px; font-size: 12.5px; font-weight: 700; white-space: nowrap; background: #2b2417; color: var(--yellow); border: 1px solid #6b5420; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+  .flyer.p { background: #241c33; color: var(--part); border-color: #5a4486; }
+
+  .compare { margin-top: 28px; }
+  .compare h2 { font-size: 20px; margin: 0 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--dim); font-size: 12px; text-transform: uppercase; letter-spacing: .06em; }
+  td:first-child { color: var(--soft); width: 22%; }
+  .tablewrap { overflow-x: auto; }
+  .note { color: var(--dim); font-size: 13px; margin-top: 12px; }
+
+  @media (max-width: 900px) {
+    .stage { grid-template-columns: 1fr; }
+    .lane { min-height: 0; }
+    .feed { max-height: 320px; }
+    .phases { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+    .phase { padding: 7px 6px; }
+    .phase small { display: none; }
+    .phase b { font-size: 11.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Forge <span>pair mode</span>, step by step</h1>
+  <p class="lede">Two different models work on one request together: they propose, argue, agree on a plan that splits the work, code at the same time while messaging each other, and check each other's part. Press play, or step through it. Switch to <b>Advisor</b> to see how the other way of using two models differs.</p>
+
+  <div class="bar">
+    <div class="seg" role="group" aria-label="Mode">
+      <button data-mode="pair" aria-pressed="true">Pair mode</button>
+      <button data-mode="advisor" aria-pressed="false">Advisor</button>
+    </div>
+    <label class="pick"><span id="leadLabel">Lead</span>
+      <select id="leadSel"></select></label>
+    <label class="pick"><span id="partLabel">Partner</span>
+      <select id="partSel"></select></label>
+    <span class="spacer"></span>
+    <button id="play" class="primary">▶ Play</button>
+    <button id="step">Step ›</button>
+    <button id="reset">↺ Restart</button>
+    <select id="speed" aria-label="Speed"><option value="1.6">Slow</option><option value="1" selected>Normal</option><option value="0.5">Fast</option></select>
+  </div>
+  <div class="warn" id="warn" role="status"></div>
+
+  <div class="phases" id="phases"></div>
+
+  <div class="stage" id="stage">
+    <section class="lane lead" id="laneL" aria-label="Lead model">
+      <div class="who"><div class="dot">L</div><div><div class="role" id="roleL">Lead · your model</div><div class="name" id="nameL"></div></div><div class="meta"><b id="reqL">0</b>requests</div></div>
+      <div class="status" id="statL">waiting</div>
+      <div class="feed" id="feedL" aria-live="polite"></div>
+    </section>
+    <div class="mid">
+      <div class="box"><h2>What is happening</h2><div class="explain" id="explain"></div></div>
+      <div class="box"><h2 id="planTitle">The agreed plan</h2><div class="plan" id="plan"><span class="empty">Not agreed yet.</span></div></div>
+      <div class="box"><h2>Files</h2><ul class="files" id="files"><li class="empty">Nothing written yet.</li></ul></div>
+    </div>
+    <section class="lane part" id="laneP" aria-label="Partner model">
+      <div class="who"><div class="dot" id="dotP">P</div><div><div class="role" id="roleP">Partner · /pair</div><div class="name" id="nameP"></div></div><div class="meta"><b id="reqP">0</b>requests</div></div>
+      <div class="status" id="statP">waiting</div>
+      <div class="feed" id="feedP" aria-live="polite"></div>
+    </section>
+  </div>
+
+  <section class="compare">
+    <h2>Pair mode or advisor?</h2>
+    <div class="tablewrap">
+    <table>
+      <thead><tr><th></th><th>Advisor</th><th>Pair mode</th></tr></thead>
+      <tbody>
+        <tr><td>Idea</td><td>A cheap model works; an expensive one is asked when it gets hard</td><td>Two different models work together as equals</td></tr>
+        <tr><td>Second model involved</td><td>Only when the working model asks, often never</td><td>On every request, from the first step to the last</td></tr>
+        <tr><td>What it does</td><td>Gives one answer: no tools, no code</td><td>Proposes, argues, writes code, reviews</td></tr>
+        <tr><td>Who decides</td><td>The working model alone</td><td>Both agree on the plan</td></tr>
+        <tr><td>Cost</td><td>Low most of the time; one expensive answer when asked</td><td>Both models' full work on every request</td></tr>
+        <tr><td>Good for</td><td>Saving money with a safety net for the hard parts</td><td>Quality and speed on larger tasks that split well</td></tr>
+      </tbody>
+    </table>
+    </div>
+    <p class="note">This page replays a scripted example (an LRU cache for an API client) to show the flow; it does not call any model. Both modes are off by default in Forge: <code>/pair</code> and <code>/advisor</code> switch them on. <a href="https://github.com/Cosmic-Game-studios/forge#models-working-together-pair-mode-and-the-advisor">Back to the README</a></p>
+  </section>
+</main>
+
+<script>
+(() => {
+  const MODELS = ["Claude Haiku 5.5", "Claude Sonnet 5.5", "Claude Opus 5.5", "Claude Fable 5.2", "GPT-5 (OpenAI)"];
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => s.replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" })[c]);
+
+  const PHASES = {
+    pair: [
+      ["Propose", "each on its own"],
+      ["Argue", "swap and critique"],
+      ["Plan & split", "one plan, two parts"],
+      ["Code together", "in parallel, talking"],
+      ["Cross-check", "until both fit"],
+    ],
+    advisor: [
+      ["Work", "the cheap model alone"],
+      ["Stuck", "a hard problem"],
+      ["Ask", "one question"],
+      ["Advice", "one answer, no tools"],
+      ["Finish", "the worker decides"],
+    ],
+  };
+
+  // L = lead / worker, P = partner / advisor, M = middle.
+  // kinds: say, tool, mail (flies between lanes), plan, file, explain, busy, idle, req
+  const SCRIPTS = {
+    pair: [
+      { ph: 0, k: "explain", t: "<p>You ask: <b>“add a cache for the API client”</b>.</p><p>Both models get the task and the project context and write their own proposal. Neither sees the other's yet.</p><p class=why>Why: two independent first drafts bring out different ideas and blind spots before any code exists.</p>" },
+      { ph: 0, k: "busy", L: "thinking about an approach", P: "thinking about an approach" },
+      { ph: 0, k: "say", who: "L", tag: "Proposal", t: "Use a plain Map as the cache, keyed by URL. Simple, no dependencies." , req: 1 },
+      { ph: 0, k: "say", who: "P", tag: "Proposal", t: "Use an LRU cache with a size limit, so memory cannot grow without bound. Evict the least recently used entry.", req: 1 },
+      { ph: 1, k: "explain", t: "<p>Now they swap. Each reads the other's proposal and must say honestly where the other is right.</p><p>An answer starts with <b>AGREE</b> or <b>DIFFER</b>. When both agree, the discussion ends early.</p><p class=why>Why: a model rarely argues with its own first idea. A partner forces the disagreement into the open.</p>" },
+      { ph: 1, k: "mail", from: "L", t: "my proposal" },
+      { ph: 1, k: "mail", from: "P", t: "my proposal" },
+      { ph: 1, k: "busy", L: "reading the partner's idea", P: "reading the lead's idea" },
+      { ph: 1, k: "say", who: "L", tag: "Critique", t: "DIFFER: the size limit is the better idea, a plain Map would leak memory on a long-running client. I take the LRU.", req: 1 },
+      { ph: 1, k: "say", who: "P", tag: "Critique", t: "AGREE: LRU with a limit. Keep the interface small: get(key) and set(key, value).", req: 1 },
+      { ph: 2, k: "explain", t: "<p>The lead writes the plan both follow: the approach, who does what, and the interfaces they share.</p><p><b>No file belongs to both</b>, so they can work at the same time without overwriting each other.</p>" },
+      { ph: 2, k: "busy", L: "writing the plan", P: "waiting for the plan" },
+      { ph: 2, k: "plan", req: "L" },
+      { ph: 2, k: "say", who: "P", tag: "Partner", t: "Got the plan. I take cache.test.js and write it against get/set." },
+      { ph: 3, k: "explain", t: "<p>Both code at the same time, each on its own model, with full tools.</p><p>They keep talking: “the interface is done”, a question instead of a guess, a problem spotted in the other's part.</p><p class=why>Why: two parts are written in parallel by two agents that know the plan and each other's interfaces.</p>" },
+      { ph: 3, k: "busy", L: "coding cache.js", P: "coding cache.test.js" },
+      { ph: 3, k: "tool", who: "L", ok: true, t: "Write cache.js · created, 42 lines", file: ["cache.js", "L"], req: 1 },
+      { ph: 3, k: "tool", who: "P", ok: true, t: "Write cache.test.js · created, 58 lines", file: ["cache.test.js", "P"], req: 1 },
+      { ph: 3, k: "mail", from: "L", t: "✉ get/set are ready", log: "get(key) and set(key, value) are in cache.js." },
+      { ph: 3, k: "tool", who: "P", ok: false, t: "Run npm test · 1 of 8 failed", req: 1 },
+      { ph: 3, k: "mail", from: "P", t: "✉ eviction order is wrong", log: "Test “evicts the least recently used” fails: get() does not move the key to the end." },
+      { ph: 3, k: "tool", who: "L", ok: true, t: "Edit cache.js · get() re-inserts the key", req: 1 },
+      { ph: 3, k: "tool", who: "P", ok: true, t: "Run npm test · 8 passed", req: 1 },
+      { ph: 4, k: "explain", t: "<p>When its part is done, each checks the other's work as agreed in the plan.</p><p>The request ends only when <b>both parts are done and fit together</b>.</p><p class=why>Why: the author of a part is never its only reader.</p>" },
+      { ph: 4, k: "busy", L: "checking the partner's tests", P: "checking the lead's code" },
+      { ph: 4, k: "tool", who: "L", ok: true, t: "Read cache.test.js · covers eviction ✔", req: 1 },
+      { ph: 4, k: "tool", who: "P", ok: true, t: "Read cache.js · matches the plan ✔" },
+      { ph: 4, k: "mail", from: "P", t: "✉ report: tests done, all pass", log: "Wrote cache.test.js (8 tests), checked cache.js against the plan, nothing open." },
+      { ph: 4, k: "say", who: "L", tag: "Done", good: true, t: "Both parts are done and fit together: an LRU cache with a size limit, 8 passing tests.", req: 1 },
+      { ph: 4, k: "idle", L: "done", P: "done" },
+    ],
+    advisor: [
+      { ph: 0, k: "explain", t: "<p>You ask: <b>“add a cache for the API client”</b>.</p><p>The cheap working model does the job alone. The advisor is <b>idle and costs nothing</b> until it is asked.</p>" },
+      { ph: 0, k: "busy", L: "working", P: null },
+      { ph: 0, k: "tool", who: "L", ok: true, t: "Read api.js · 120 lines", req: 1 },
+      { ph: 0, k: "tool", who: "L", ok: true, t: "Write cache.js · created, 40 lines", file: ["cache.js", "L"], req: 1 },
+      { ph: 0, k: "tool", who: "L", ok: true, t: "Write cache.test.js · created, 50 lines", file: ["cache.test.js", "L"], req: 1 },
+      { ph: 1, k: "explain", t: "<p>A test keeps failing. The worker tried twice and does not see why.</p><p>This is the moment the advisor exists for: a hard problem the cheap model is stuck on.</p>" },
+      { ph: 1, k: "tool", who: "L", ok: false, t: "Run npm test · 1 of 8 failed", req: 1 },
+      { ph: 1, k: "tool", who: "L", ok: false, t: "Edit cache.js · Run npm test · still failing", req: 1 },
+      { ph: 2, k: "explain", t: "<p>The worker calls the <b>advisor</b> tool with one question. The advisor gets the question and a condensed transcript.</p><p>It may be asked at most a few times per request.</p>" },
+      { ph: 2, k: "mail", from: "L", t: "❓ why does eviction fail?", log: "My LRU evicts the wrong key after get(). What is the right way with a Map?" },
+      { ph: 2, k: "busy", L: "waiting for advice", P: "thinking" },
+      { ph: 3, k: "explain", t: "<p>The advisor answers <b>once</b>. It has no tools and writes no code.</p><p class=why>One expensive answer instead of an expensive model on every step.</p>" },
+      { ph: 3, k: "say", who: "P", tag: "Advice", t: "In get(), delete the key and set it again so it moves to the end of the Map. Evict map.keys().next().value.", req: 1 },
+      { ph: 3, k: "mail", from: "P", t: "💡 one answer", log: "" },
+      { ph: 3, k: "idle", L: null, P: "idle again" },
+      { ph: 4, k: "explain", t: "<p>The worker stays in charge: it decides what to do with the advice and finishes the job alone.</p><p>Compare the request counts: the expensive model was used <b>once</b>.</p>" },
+      { ph: 4, k: "busy", L: "applying the advice", P: null },
+      { ph: 4, k: "tool", who: "L", ok: true, t: "Edit cache.js · re-insert on get()", req: 1 },
+      { ph: 4, k: "tool", who: "L", ok: true, t: "Run npm test · 8 passed", req: 1 },
+      { ph: 4, k: "say", who: "L", tag: "Done", good: true, t: "Added an LRU cache with 8 passing tests. Asked the advisor once about eviction order.", req: 1 },
+      { ph: 4, k: "idle", L: "done", P: "idle" },
+    ],
+  };
+
+  let mode = "pair";
+  let i = 0;
+  let timer = null;
+  let playing = false;
+  let reqs = { L: 0, P: 0 };
+
+  const leadSel = $("leadSel"), partSel = $("partSel");
+  for (const m of MODELS) { leadSel.add(new Option(m, m)); partSel.add(new Option(m, m)); }
+  leadSel.value = "Claude Haiku 5.5";
+  partSel.value = "Claude Opus 5.5";
+
+  const short = (n) => n.replace(/^Claude /, "");
+  const names = () => ({ L: leadSel.value, P: partSel.value });
+
+  function validate() {
+    const same = leadSel.value === partSel.value;
+    $("warn").textContent = same
+      ? (mode === "pair" ? "A pair needs two different models. Pick another partner." : "The advisor must be a different, stronger model than the worker.")
+      : "";
+    $("play").disabled = $("step").disabled = same;
+    if (same) stop();
+    return !same;
+  }
+
+  function renderPhases(cur) {
+    const ph = PHASES[mode];
+    $("phases").innerHTML = ph.map(([t, s], k) =>
+      `<button class="phase ${k === cur ? "on" : k < cur ? "done" : ""}" data-ph="${k}" aria-current="${k === cur ? "step" : "false"}"><b>${k + 1} · ${t}</b><small>${s}</small></button>`).join("");
+  }
+
+  function clear() {
+    $("feedL").innerHTML = $("feedP").innerHTML = "";
+    $("plan").innerHTML = mode === "pair" ? '<span class="empty">Not agreed yet.</span>' : '<span class="empty">The advisor writes no plan and no code. It only answers.</span>';
+    $("files").innerHTML = '<li class="empty">Nothing written yet.</li>';
+    $("explain").innerHTML = '<p class="why">Press <b>Play</b> or <b>Step</b>.</p>';
+    reqs = { L: 0, P: 0 };
+    $("reqL").textContent = $("reqP").textContent = "0";
+    setStatus("L", "waiting", false);
+    setStatus("P", mode === "pair" ? "waiting" : "idle · costs nothing until asked", false);
+    $("laneP").classList.toggle("idle", mode === "advisor");
+    document.querySelectorAll(".flyer").forEach((f) => f.remove());
+    renderPhases(-1);
+  }
+
+  function labels() {
+    document.body.classList.toggle("advisor", mode === "advisor");
+    const n = names();
+    $("nameL").textContent = n.L;
+    $("nameP").textContent = n.P;
+    $("roleL").textContent = mode === "pair" ? "Lead · your model" : "Worker · your model";
+    $("roleP").textContent = mode === "pair" ? "Partner · /pair" : "Advisor · /advisor";
+    $("dotP").textContent = mode === "pair" ? "P" : "A";
+    $("leadLabel").textContent = mode === "pair" ? "Lead" : "Worker";
+    $("partLabel").textContent = mode === "pair" ? "Partner" : "Advisor";
+    $("planTitle").textContent = mode === "pair" ? "The agreed plan" : "Plan";
+  }
+
+  function setStatus(w, text, busy) {
+    const el = $(w === "L" ? "statL" : "statP");
+    el.textContent = text;
+    el.classList.toggle("busy", !!busy);
+  }
+
+  function addReq(w, n = 1) {
+    reqs[w] += n;
+    $(w === "L" ? "reqL" : "reqP").textContent = reqs[w];
+  }
+
+  function push(w, html, cls = "") {
+    const feed = $(w === "L" ? "feedL" : "feedP");
+    const el = document.createElement("div");
+    el.className = "item " + cls;
+    el.innerHTML = html;
+    feed.appendChild(el);
+    feed.scrollTop = feed.scrollHeight;
+  }
+
+  function addFile(name, by) {
+    const ul = $("files");
+    if (ul.querySelector(".empty")) ul.innerHTML = "";
+    const n = names();
+    const li = document.createElement("li");
+    li.innerHTML = `<span>${esc(name)}</span><span class="by-${by === "L" ? "l" : "p"}">${esc(short(n[by]))}</span>`;
+    ul.appendChild(li);
+  }
+
+  function fly(from, text, animate) {
+    if (!animate || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const stage = $("stage");
+    const s = stage.getBoundingClientRect();
+    const a = $(from === "L" ? "laneL" : "laneP").getBoundingClientRect();
+    const b = $(from === "L" ? "laneP" : "laneL").getBoundingClientRect();
+    const f = document.createElement("div");
+    f.className = "flyer" + (from === "P" ? " p" : "");
+    f.textContent = text;
+    stage.appendChild(f);
+    const fw = f.offsetWidth, fh = f.offsetHeight;
+    const x0 = a.left - s.left + a.width / 2 - fw / 2, y0 = a.top - s.top + Math.min(a.height / 2, 140);
+    const x1 = b.left - s.left + b.width / 2 - fw / 2, y1 = b.top - s.top + Math.min(b.height / 2, 140);
+    f.style.left = "0px"; f.style.top = "0px";
+    const dur = 1100 * Number($("speed").value);
+    f.animate([
+      { transform: `translate(${x0}px, ${y0}px) scale(.8)`, opacity: 0 },
+      { transform: `translate(${x0}px, ${y0 - 10}px) scale(1)`, opacity: 1, offset: .15 },
+      { transform: `translate(${x1}px, ${y1 - 10}px) scale(1)`, opacity: 1, offset: .85 },
+      { transform: `translate(${x1}px, ${y1}px) scale(.8)`, opacity: 0 },
+    ], { duration: dur, easing: "ease-in-out" }).onfinish = () => f.remove();
+  }
+
+  function planHtml() {
+    const n = names();
+    return `<span class="hd">## Approach</span>
+An LRU cache with a size limit.
+
+<span class="hd">## <span class="l">${esc(short(n.L))}</span> (lead) does</span>
+- cache.js: get, set, eviction
+
+<span class="hd">## <span class="p">${esc(short(n.P))}</span> (partner) does</span>
+- cache.test.js: 8 tests
+
+<span class="hd">## Shared</span>
+- get(key), set(key, value)
+- each checks the other's part`;
+  }
+
+  function apply(e, animate) {
+    const n = names();
+    renderPhases(e.ph);
+    switch (e.k) {
+      case "explain": $("explain").innerHTML = e.t; break;
+      case "busy":
+      case "idle":
+        if (e.L !== null && e.L !== undefined) setStatus("L", e.L, e.k === "busy");
+        if (e.P !== null && e.P !== undefined) setStatus("P", e.P, e.k === "busy");
+        if (mode === "advisor") $("laneP").classList.toggle("idle", !(e.k === "busy" && e.P));
+        break;
+      case "say":
+        push(e.who, `<span class="tag">${esc(e.tag)}</span>${esc(e.t)}`, e.good ? "good" : "");
+        if (e.req) addReq(e.who, e.req);
+        break;
+      case "tool":
+        push(e.who, `<span class="${e.ok ? "ok" : "bad"}">●</span> ${esc(e.t)}`, "tool");
+        if (e.file) addFile(e.file[0], e.file[1]);
+        if (e.req) addReq(e.who, e.req);
+        break;
+      case "mail": {
+        const to = e.from === "L" ? "P" : "L";
+        fly(e.from, e.t, animate);
+        if (e.log) push(to, `<span class="tag">✉ from ${esc(short(n[e.from]))}</span>${esc(e.log)}`, "mail");
+        break;
+      }
+      case "plan":
+        $("plan").innerHTML = planHtml();
+        if (e.req) addReq(e.req, 1);
+        push("L", `<span class="tag">Plan</span>Wrote the plan and split the work in two.`);
+        break;
+    }
+  }
+
+  function next(animate = true) {
+    const s = SCRIPTS[mode];
+    if (i >= s.length) { stop(); return false; }
+    apply(s[i++], animate);
+    if (i >= s.length) { stop(); $("play").textContent = "▶ Replay"; }
+    return true;
+  }
+
+  function delayFor(e) {
+    const base = e.k === "explain" ? 2600 : e.k === "busy" || e.k === "idle" ? 700 : e.k === "mail" ? 1400 : 1500;
+    return base * Number($("speed").value);
+  }
+
+  function tick() {
+    if (!playing) return;
+    if (!next(true)) return;
+    const s = SCRIPTS[mode];
+    if (i < s.length) timer = setTimeout(tick, delayFor(s[i - 1]));
+  }
+
+  function play() {
+    if (!validate()) return;
+    if (i >= SCRIPTS[mode].length) restart();
+    playing = true;
+    $("play").textContent = "❚❚ Pause";
+    tick();
+  }
+  function stop() {
+    playing = false;
+    clearTimeout(timer);
+    if (i < SCRIPTS[mode].length) $("play").textContent = "▶ Play";
+  }
+  function restart() { stop(); i = 0; clear(); labels(); $("play").textContent = "▶ Play"; }
+
+  function jump(ph) {
+    stop();
+    i = 0; clear(); labels();
+    const s = SCRIPTS[mode];
+    while (i < s.length && s[i].ph < ph) apply(s[i++], false);
+    // Show the phase's explanation and who is busy; the steps then play from there.
+    while (i < s.length && s[i].ph === ph && (s[i].k === "explain" || s[i].k === "busy")) apply(s[i++], false);
+  }
+
+  $("play").onclick = () => (playing ? stop() : play());
+  $("step").onclick = () => { stop(); if (validate()) { if (i >= SCRIPTS[mode].length) restart(); next(true); } };
+  $("reset").onclick = restart;
+  $("phases").onclick = (ev) => { const b = ev.target.closest("[data-ph]"); if (b && validate()) jump(Number(b.dataset.ph)); };
+  for (const sel of [leadSel, partSel]) sel.onchange = () => { validate(); restart(); };
+  document.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => {
+    mode = b.dataset.mode;
+    document.querySelectorAll("[data-mode]").forEach((x) => x.setAttribute("aria-pressed", String(x === b)));
+    if (mode === "advisor") { leadSel.value = "Claude Haiku 5.5"; partSel.value = "Claude Fable 5.2"; }
+    else { leadSel.value = "Claude Haiku 5.5"; partSel.value = "Claude Opus 5.5"; }
+    restart(); validate();
+  });
+
+  restart();
+  validate();
+})();
+</script>
+</body>
+</html>
