@@ -100,6 +100,12 @@ Forge can put more than one model on a request. There are two ways, and they sol
 
 `/pair` picks a second model that works on **every request together with the main model, as equals**. The two must be different models; they can come from different providers, for example Claude Opus 5.5 with an OpenAI model, or Claude Haiku 5.5 with Claude Fable 5.2.
 
+<p align="center">
+  <a href="https://cosmic-game-studios.github.io/forge/demo/pair/"><img src="assets/pair.svg" alt="Pair mode, animated: two different models each propose an approach, swap and critique, agree on a plan that splits the work, code their parts at the same time while messaging each other, then cross-check each other's work" width="100%"></a>
+</p>
+
+**[▶ Step through it interactively](https://cosmic-game-studios.github.io/forge/demo/pair/)** — play, pause, jump between the phases, pick the two models, and switch to the advisor to see the difference side by side.
+
 How a request runs in pair mode:
 
 1. **Both propose.** Each model gets the task and the project context and writes its own approach — files, risks, how to verify — without seeing the other's.
