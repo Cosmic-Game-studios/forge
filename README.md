@@ -62,6 +62,26 @@ Most agents are a loop around a model: prompt, tool call, repeat. The model writ
 | **Graded compaction** | When the context fills up, the cheapest model summarises it: old turns briefly, recent ones in detail, the newest word for word. |
 | **Memory and undo** | Project notes survive between sessions. Every request is a checkpoint; `/undo` takes its file changes back. |
 
+## What makes Forge different from Claude Code and Codex
+
+Claude Code and Codex are excellent, mature products from the companies that make the models. They have far more polish, sandboxing, IDE integrations and users than a young alpha. Forge does not try to copy them. It makes a different bet:
+
+> **The next jump in coding agents comes less from a smarter model and more from a harness that refuses to trust the model's own "done".**
+
+| | Forge | Claude Code / Codex |
+|---|---|---|
+| **Checking the work** | Built into the loop and on by default: every edit is answered with type, lint and quality feedback; a second model reads along; a reviewer with a fresh context must pass larger changes before the turn ends. | The model largely decides when and how to verify. Review, hooks and checks exist, but you invoke or configure them. |
+| **Who reviews** | A separate run that never saw the author's reasoning, only your request and the diff, so it cannot be talked into the author's blind spots. | Review is typically a command you run, or the same conversation looking at its own work. |
+| **Seeing the result** | Ships with eyes: `screenshot` returns the picture plus the page's errors, and `scene3d` reads a live three.js scene as numbers and four views. | General-purpose tools; visual and 3D inspection come through extensions you add. |
+| **Models** | One harness for Anthropic, OpenRouter and OpenAI-compatible keys. The cheapest model you have does the side jobs (triage, watching, compaction) so the expensive one only does the thinking. | Each is built around its maker's models and subscription. |
+| **Size** | About 30 source files, one runtime dependency, strict TypeScript. Small enough to read in an afternoon and change in an evening. | Large products; you configure them rather than rewrite them. |
+| **Every layer is a switch** | `/review`, `/watch`, `/autocheck`, `/prepare` turn each layer on or off, and the repository includes the benchmark that measures what each one buys. | Tuned as a whole by the vendor. |
+| **Honesty about results** | The README states what was measured, including where Forge is not ahead. | — |
+
+Where they are clearly ahead today: sandboxed execution, IDE and cloud integrations, background tasks, team features, and years of hardening. If you need those, use them. If you want an agent whose every decision you can read, measure and change, that is what Forge is for.
+
+<sub>Comparison as of November 2026 and to the best of our knowledge; both products move fast. Corrections are welcome.</sub>
+
 ## Tools that let the model see
 
 - **`scene3d`** — opens a page in a headless browser and reads the real three.js scene: every object with position, size, distance from the camera and whether the camera sees it, plus pictures from the camera, from above, from the front and from the side. The model can press keys and compare positions before and after. Works on unmodified pages.
@@ -127,6 +147,27 @@ Forge is measured against a plain loop and against Claude Code, with the same mo
 - **Easy tasks**: the full harness and a bare loop both passed everything; the harness used about 10 % fewer requests and about 20 % more money.
 
 In plain words: at this point Forge is on par, not ahead. The review pass, the watcher, the instant edit feedback and the 3D tools were added after these runs and **their effect on quality has not been measured yet**. The review pass alone makes small tasks roughly three to four times slower and more expensive. The benchmark scripts are in [`bench/`](bench) so you can repeat this yourself.
+
+## Where Forge is going
+
+The goal is simple to say and hard to reach: **the same model should write measurably better code inside Forge than anywhere else** — and the gap should grow with the model's size. The road there, in order:
+
+**Next**
+- **Prove it.** Benchmark every layer on tasks hard enough to separate agents, with blind code review, and publish the numbers — including the layers that turn out not to pay for themselves.
+- **Frontend with taste.** A design measurement tool (contrast, overlap, overflow, inconsistent spacing and type), an independent design critic that judges screenshots like a strict designer, design tokens fixed before the first line, and screenshots of every state: hover, focus, empty, error, dark mode, three widths.
+- **Instant feedback in more languages.** Type checks for Python, Go and Rust alongside TypeScript.
+
+**After that**
+- **Semantic navigation.** Go-to-definition, find-references and safe rename through language servers, instead of text search.
+- **Background processes.** Dev servers and watchers the agent can start, read and stop.
+- **Behaviour comparison.** Run old and new code on the same inputs to prove a refactor changed nothing.
+- **Sandboxed execution** for commands, so `yolo` mode stops being a leap of faith.
+
+**Further out**
+- **Several candidate solutions in parallel,** judged by tests and the reviewer, with the best one kept.
+- **A persistent project map** the agent builds once and keeps current, so large codebases cost no more to enter than small ones.
+- **Tuning for every major model family,** not only Claude.
+- **An npm package** and a licence, so installing Forge is one line.
 
 ## Status
 
