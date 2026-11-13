@@ -48,6 +48,16 @@
 ╰────────────────────────────────────────────────────────────────────────────╯
 ```
 
+## Demo: an Earth built by Forge
+
+<p align="center">
+  <a href="demo/earth"><img src="assets/demo-earth.png" alt="Interactive 3D Earth with clouds, atmosphere and city lights, built by Forge" width="100%"></a>
+</p>
+
+An interactive 3D Earth with day and night sides, city lights, clouds, an atmosphere shader and bloom — built by Forge from a chat request. The picture above was taken by Forge's own `screenshot` tool. While building, the agent checked the scene with `scene3d`, and the independent reviewer caught black streaks on steep mountain slopes before the agent called it done.
+
+Code, tests and how to run it: [`demo/earth`](demo/earth).
+
 ## Why Forge
 
 Most agents are a loop around a model: prompt, tool call, repeat. The model writes code, says it is done, and you find out later whether that was true. Forge puts a harness around the same loop so that a mistake is caught at the step where it happens.
