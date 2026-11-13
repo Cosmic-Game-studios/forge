@@ -10,43 +10,38 @@
   <img alt="language" src="https://img.shields.io/badge/TypeScript-strict-3178c6?style=flat-square">
 </p>
 
+<h3 align="center">A terminal coding agent that does not take its own word for it.</h3>
+
 <p align="center">
-  <b>A terminal coding agent that does not take its own word for it.</b><br>
   Forge wraps a model in layers that catch mistakes while they are cheap:<br>
   feedback on every edit, a second pair of eyes before "done", and tools that let it <i>see</i> what it built.
 </p>
 
----
+<p align="center">
+  <a href="#quick-start"><b>Quick start</b></a> ·
+  <a href="https://cosmic-game-studios.github.io/forge/demo/earth/earth.html"><b>Live demo</b></a> ·
+  <a href="#how-it-works"><b>How it works</b></a> ·
+  <a href="#what-makes-forge-different-from-claude-code-and-codex"><b>vs. Claude Code and Codex</b></a> ·
+  <a href="#what-has-been-measured"><b>Measurements</b></a> ·
+  <a href="#where-forge-is-going"><b>Roadmap</b></a>
+</p>
 
-```text
-╭────────────────────────────────────────────────────────────────────────────╮
-│            Forge Coding Agent v0.2.0 alpha                                 │
-│     ▄                                                                      │
-│    ▟█▙     Model     Claude Opus 5.5 claude-opus-5-5                       │
-│   ▟███▙    Provider  Anthropic                                             │
-│  ▟█████▙   Effort    high (/effort to change)                              │
-│  █ ● ● █   Mode      ask — asks before edits and commands                  │
-│  ▜█▄▄▄█▛   Folder    ~/projects/my-app                                     │
-│   ▀▘ ▝▀    Extras    4 skills · 0 MCP tools                                │
-╰────────────────────────────────────────────────────────────────────────────╯
+<p align="center">
+  <img src="assets/terminal.svg" alt="A Forge session: the agent edits a file, the watcher flags a swallowed error, the agent fixes it, checks and an independent review pass, and a summary card closes the request" width="100%">
+</p>
 
- ❯ add rate limiting to the upload route
-
-● Edit src/routes/upload.ts
-  ⎿ 12 lines changed
-● Check  npm test
-  ⎿ 48 passed
-● Review  independent reviewer, fresh context
-  ⎿ no findings
-
-╭─ Done ─────────────────────────────────────────────────────────────────────╮
-│ Changed  src/routes/upload.ts +14 −2                                       │
-│          test/upload.test.ts +31 new                                       │
-│ Verified ✓ checks passed · ✓ review: no findings                           │
-│ Took     1m 12s · 9 model requests · $0.0412                               │
-│          /undo takes these changes back                                    │
-╰────────────────────────────────────────────────────────────────────────────╯
-```
+<table>
+  <tr>
+    <td width="33%" valign="top"><h4>🔍 Caught at the edit</h4>Every write comes back with its syntax, type and lint errors and with plain quality notes. The model fixes a mistake in the step where it made it.</td>
+    <td width="33%" valign="top"><h4>🧑‍⚖️ Reviewed by a stranger</h4>Before "done", a second run with an empty context reads only your request and the diff, and tries to break the change.</td>
+    <td width="33%" valign="top"><h4>👁️ Eyes for UI and 3D</h4>Screenshots with the page's errors, and a live three.js scene read as numbers and four views. No guessing what the result looks like.</td>
+  </tr>
+  <tr>
+    <td valign="top"><h4>🔌 Any key, one harness</h4>Anthropic, OpenRouter and OpenAI-compatible endpoints. The cheapest model you have does the side jobs.</td>
+    <td valign="top"><h4>↩️ Nothing is final</h4>Every request is a checkpoint. <code>/undo</code> takes its file changes back, and a card shows what changed and what was verified.</td>
+    <td valign="top"><h4>🪶 Small enough to read</h4>About 35 source files, one runtime dependency, 51 tests. Every layer is a switch you can turn off and measure.</td>
+  </tr>
+</table>
 
 ## Demo: an Earth built by Forge
 
@@ -58,9 +53,13 @@ An interactive 3D Earth with day and night sides, city lights, clouds, an atmosp
 
 **[▶ Open the live demo](https://cosmic-game-studios.github.io/forge/demo/earth/earth.html)** — drag to rotate, scroll to zoom, space to pause. Code and tests: [`demo/earth`](demo/earth).
 
-## Why Forge
+## How it works
 
 Most agents are a loop around a model: prompt, tool call, repeat. The model writes code, says it is done, and you find out later whether that was true. Forge puts a harness around the same loop so that a mistake is caught at the step where it happens.
+
+<p align="center">
+  <img src="assets/layers.svg" alt="How a request flows through Forge: preparation, the work loop with instant edit feedback and a watcher, automatic checks, independent review, then done; failures and findings go back to the model" width="100%">
+</p>
 
 | Layer | What it does |
 |---|---|
@@ -136,6 +135,10 @@ forge -p "fix the failing test" --mode auto-edit   # headless, may edit
 
 ## Commands
 
+<details>
+<summary><b>All slash commands</b></summary>
+<br>
+
 | | |
 |---|---|
 | `/model` `/effort` `/subagent` | choose the model, how hard it thinks, and the model for sub-agents |
@@ -147,6 +150,8 @@ forge -p "fix the failing test" --mode auto-edit   # headless, may edit
 | `/budget` `/cost` `/status` | spending limit, usage, and everything at a glance |
 | `/init` | let Forge study the project and write `FORGE.md` |
 | `/keys` `/web` `/thinking` `/help` `/exit` | settings and the rest |
+
+</details>
 
 ## What has been measured
 
@@ -213,6 +218,9 @@ npm run typecheck
 npm run dev          # run from source
 ```
 
+<details>
+<summary><b>Source layout</b></summary>
+
 ```text
 src/
   agent.ts        the loop and every harness layer around it
@@ -228,6 +236,8 @@ bench/            benchmarks against a bare loop and against Claude Code
 test/             tests and the scripted API
 ```
 
+</details>
+
 ---
 
-<p align="center"><sub>Built with Forge's mascot, Ember, keeping watch.</sub></p>
+<p align="center"><sub>Built by a human and Claude Fable 5.2, with Ember keeping watch. · <a href="#readme">Back to top</a></sub></p>

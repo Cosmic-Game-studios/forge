@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 400" width="1000" height="400" role="img" aria-label="How a request flows through Forge: preparation, the work loop with instant edit feedback and a watcher, automatic checks, independent review, then done. Failures and findings go back to the model.">
+  <defs>
+    <marker id="a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#ff8a2a"/>
+    </marker>
+    <marker id="b" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#ffd166"/>
+    </marker>
+  </defs>
+  <style>
+    text { font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }
+    .t { fill: #f3ece4; font-size: 16px; font-weight: 700; }
+    .s { fill: #a39a90; font-size: 12.5px; }
+    .box { fill: #17161a; stroke: #ff8a2a; stroke-opacity: 0.55; stroke-width: 1.4; }
+    .chip { fill: #221c17; stroke: #ffd166; stroke-opacity: 0.45; stroke-width: 1; }
+    .ct { fill: #ffd166; font-size: 13px; font-weight: 700; }
+    .flow { stroke: #ff8a2a; stroke-width: 1.8; fill: none; }
+    .back { stroke: #ffd166; stroke-width: 1.6; fill: none; stroke-dasharray: 5 5; }
+  </style>
+
+  <rect width="1000" height="400" rx="16" fill="#0e0f13"/>
+  <rect x="0.75" y="0.75" width="998.5" height="398.5" rx="15.25" fill="none" stroke="#2a2622" stroke-width="1.5"/>
+
+  <!-- 1 request -->
+  <rect class="box" x="24" y="96" width="128" height="76" rx="10" stroke-dasharray="4 4"/>
+  <text class="t" x="88" y="130" text-anchor="middle">Your request</text>
+  <text class="s" x="88" y="151" text-anchor="middle">plain words</text>
+
+  <!-- 2 prepare -->
+  <rect class="box" x="180" y="96" width="150" height="76" rx="10"/>
+  <text class="t" x="255" y="124" text-anchor="middle">Prepare</text>
+  <text class="s" x="255" y="144" text-anchor="middle">project snapshot</text>
+  <text class="s" x="255" y="160" text-anchor="middle">mentions · triage</text>
+
+  <!-- 3 loop -->
+  <rect class="box" x="358" y="40" width="250" height="188" rx="12" stroke-opacity="0.95"/>
+  <text class="t" x="483" y="70" text-anchor="middle">Work loop</text>
+  <text class="s" x="483" y="89" text-anchor="middle">model ⇄ tools</text>
+  <rect class="chip" x="374" y="104" width="218" height="50" rx="8"/>
+  <text class="ct" x="483" y="125" text-anchor="middle">Instant edit feedback</text>
+  <text class="s" x="483" y="143" text-anchor="middle">syntax · types · lint · notes</text>
+  <rect class="chip" x="374" y="164" width="218" height="50" rx="8"/>
+  <text class="ct" x="483" y="185" text-anchor="middle">Watcher</text>
+  <text class="s" x="483" y="203" text-anchor="middle">a small model reads along</text>
+
+  <!-- 4 checks -->
+  <rect class="box" x="636" y="96" width="140" height="76" rx="10"/>
+  <text class="t" x="706" y="124" text-anchor="middle">Checks</text>
+  <text class="s" x="706" y="144" text-anchor="middle">tests and build,</text>
+  <text class="s" x="706" y="160" text-anchor="middle">run automatically</text>
+
+  <!-- 5 review -->
+  <rect class="box" x="804" y="96" width="172" height="76" rx="10"/>
+  <text class="t" x="890" y="124" text-anchor="middle">Independent review</text>
+  <text class="s" x="890" y="144" text-anchor="middle">fresh context: sees only</text>
+  <text class="s" x="890" y="160" text-anchor="middle">the request and the diff</text>
+
+  <!-- 6 done -->
+  <rect x="804" y="222" width="172" height="62" rx="10" fill="#16241b" stroke="#5fd38d" stroke-opacity="0.7" stroke-width="1.4"/>
+  <text class="t" x="890" y="249" text-anchor="middle" style="fill:#8fe6b0">Done</text>
+  <text class="s" x="890" y="268" text-anchor="middle">summary card · /undo</text>
+
+  <!-- forward arrows -->
+  <path class="flow" d="M152 134H176" marker-end="url(#a)"/>
+  <path class="flow" d="M330 134H354" marker-end="url(#a)"/>
+  <path class="flow" d="M608 134H632" marker-end="url(#a)"/>
+  <path class="flow" d="M776 134H800" marker-end="url(#a)"/>
+  <path d="M890 172V218" stroke="#5fd38d" stroke-width="1.8" fill="none" marker-end="url(#b)" style="marker-end:none"/>
+  <path d="M884 210L890 219L896 210z" fill="#5fd38d"/>
+
+  <!-- feedback arrows -->
+  <path class="back" d="M706 172V262H520V232" marker-end="url(#b)"/>
+  <path class="back" d="M836 172V198H706"/>
+  <text class="s" x="612" y="282" text-anchor="middle" style="fill:#ffd166">failures and findings go back to the model</text>
+
+  <!-- always on -->
+  <rect x="24" y="318" width="952" height="58" rx="10" fill="#131318" stroke="#3a342e" stroke-width="1.2"/>
+  <text class="s" x="44" y="352" style="font-size:13px;fill:#8b8378;font-weight:700;letter-spacing:1px">ALWAYS ON</text>
+  <text class="t" x="330" y="345" text-anchor="middle" style="font-size:14.5px">Graded compaction</text>
+  <text class="s" x="330" y="363" text-anchor="middle">old turns brief, recent ones verbatim</text>
+  <text class="t" x="590" y="345" text-anchor="middle" style="font-size:14.5px">Project notes</text>
+  <text class="s" x="590" y="363" text-anchor="middle">facts that survive sessions</text>
+  <text class="t" x="840" y="345" text-anchor="middle" style="font-size:14.5px">Checkpoints</text>
+  <text class="s" x="840" y="363" text-anchor="middle">every request can be undone</text>
+</svg>
