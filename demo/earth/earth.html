@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Erde 3D</title>
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      overflow: hidden;
+      background: #000;
+      color: #cfe3ff;
+      font-family: system-ui, sans-serif;
+    }
+    canvas { display: block; touch-action: none; cursor: grab; }
+    canvas:active { cursor: grabbing; }
+    #status, #hint {
+      position: fixed;
+      left: 0;
+      right: 0;
+      text-align: center;
+      pointer-events: none;
+      text-shadow: 0 1px 4px #000;
+    }
+    #status { top: 50%; padding: 0 16px; font-size: 1.2rem; }
+    #hint { bottom: 14px; padding: 0 12px; font-size: 0.85rem; opacity: 0.7; }
+  </style>
+  <!-- Nur über einen lokalen Server öffnen, z. B. `python -m http.server` im Projektordner:
+       Browser laden ES-Module über file:// nicht. -->
+  <script type="importmap">
+    { "imports": { "three": "./vendor/three.module.js", "three/addons/": "./vendor/addons/" } }
+  </script>
+</head>
+<body>
+  <div id="status">Lade Erde …</div>
+  <div id="hint">Ziehen: drehen · Mausrad / Pinch: zoomen · Leertaste: Rotation an/aus</div>
+  <script>
+    // Klassisches Skript: läuft auch dann, wenn das Modul darunter nicht geladen werden kann.
+    if (location.protocol === 'file:') {
+      document.getElementById('status').textContent =
+        'Bitte über einen lokalen Server öffnen: im Projektordner „python -m http.server“ starten, ' +
+        'dann http://localhost:8000/earth.html aufrufen.';
+    } else {
+      window.addEventListener('error', () => {
+        const status = document.getElementById('status');
+        status.hidden = false;
+        status.textContent = 'Die Erde konnte nicht gestartet werden (Datei fehlt oder kein WebGL 2). ' +
+          'Details stehen in der Browser-Konsole.';
+      // capture: Ladefehler von Skripten steigen nicht bis window auf.
+      }, true);
+    }
+  </script>
+  <script type="module" src="earth.js"></script>
+</body>
+</html>
