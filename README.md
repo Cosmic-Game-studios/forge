@@ -169,6 +169,22 @@ The goal is simple to say and hard to reach: **the same model should write measu
 - **Tuning for every major model family,** not only Claude.
 - **An npm package** and a licence, so installing Forge is one line.
 
+## How Claude is used in this project
+
+Forge is built by a human and an AI working together, and we say so openly. **Claude Fable 5.2** (Anthropic) is the project's co-author. Every commit it worked on carries a `Co-Authored-By` line.
+
+The direction comes from the human side: what Forge should be, which features get built, what is good enough and what is not. Fable's part:
+
+- **Writes code** — implements features and fixes across the harness, the tools and the terminal interface.
+- **Reviews changes** — reads each change for bugs, missed edge cases and leftovers before it is committed.
+- **Runs the tests** — the full suite and the type check after every change, and writes new tests for new behaviour.
+- **Verifies in the real thing** — drives the terminal interface, renders pages in a headless browser and checks the result, instead of trusting that the code looks right.
+- **Benchmarks** — builds the tasks and hidden tests, runs Forge against a bare loop and against Claude Code, and reports the numbers as they are, including the unflattering ones.
+- **Guards the repository** — scans every upload for API keys and private data before anything is published.
+- **Writes the documentation** — including this README.
+
+Claude models are also what Forge itself runs on by default: the main model does the work, and the cheapest one (Haiku) handles task triage, watching edits and compaction.
+
 ## Status
 
 This is an **alpha**. It works, it has 51 tests, and it will change.
