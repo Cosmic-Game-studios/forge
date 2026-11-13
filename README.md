@@ -74,7 +74,7 @@ Claude Code and Codex are excellent, mature products from the companies that mak
 | **Who reviews** | A separate run that never saw the author's reasoning, only your request and the diff, so it cannot be talked into the author's blind spots. | Review is typically a command you run, or the same conversation looking at its own work. |
 | **Seeing the result** | Ships with eyes: `screenshot` returns the picture plus the page's errors, and `scene3d` reads a live three.js scene as numbers and four views. | General-purpose tools; visual and 3D inspection come through extensions you add. |
 | **Models** | One harness for Anthropic, OpenRouter and OpenAI-compatible keys. The cheapest model you have does the side jobs (triage, watching, compaction) so the expensive one only does the thinking. | Each is built around its maker's models and subscription. |
-| **Size** | About 30 source files, one runtime dependency, strict TypeScript. Small enough to read in an afternoon and change in an evening. | Large products; you configure them rather than rewrite them. |
+| **Size** | About 35 source files, one runtime dependency, strict TypeScript. Small enough to read in an afternoon and change in an evening. | Large products; you configure them rather than rewrite them. |
 | **Every layer is a switch** | `/review`, `/watch`, `/autocheck`, `/prepare` turn each layer on or off, and the repository includes the benchmark that measures what each one buys. | Tuned as a whole by the vendor. |
 | **Honesty about results** | The README states what was measured, including where Forge is not ahead. | — |
 
