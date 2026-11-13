@@ -1,0 +1,13 @@
+node_modules
+dist
+
+# Never commit keys or local state. Forge keeps API keys in ~/.forge/config.json, outside any project.
+.env
+.env.*
+.forge/
+config.json
+
+# Benchmark runs: logs and workspaces from this machine
+bench/logs/
+bench/versus/
+*.log
