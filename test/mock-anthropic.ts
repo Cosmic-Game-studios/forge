@@ -9,8 +9,11 @@ export type ScriptBlock =
   | { type: "thinking"; thinking: string }
   | { type: "tool_use"; id: string; name: string; input: unknown; rawJson?: string };
 
+/** Optional pause (ms) after a block has streamed, to look at the screen mid-response. */
+export type HeldBlock = ScriptBlock & { hold?: number };
+
 export interface ScriptTurn {
-  content: ScriptBlock[];
+  content: HeldBlock[];
   stop_reason: string;
   /** Only answer a request this accepts. Requests that race (the watcher) need it; give it to every turn of such a script. */
   when?: (body: any) => boolean;
@@ -41,7 +44,7 @@ export async function startMock(script: ScriptTurn[]): Promise<MockServer> {
   const server = http.createServer((req, res) => {
     let raw = "";
     req.on("data", (d) => (raw += d));
-    req.on("end", () => {
+    req.on("end", async () => {
       const body = raw ? JSON.parse(raw) : {};
       requests.push({ headers: req.headers, body });
       const index = script.findIndex((s, i) => !used.has(i) && (!s.when || s.when(body)));
@@ -72,7 +75,7 @@ export async function startMock(script: ScriptTurn[]): Promise<MockServer> {
           usage: { input_tokens: 100, output_tokens: 1, cache_read_input_tokens: turn > 1 ? 900 : 0, cache_creation_input_tokens: turn > 1 ? 50 : 950 },
         },
       });
-      t.content.forEach((b, index) => {
+      for (const [index, b] of t.content.entries()) {
         if (b.type === "text") {
           sse(res, "content_block_start", { type: "content_block_start", index, content_block: { type: "text", text: "" } });
           for (const part of chunks(b.text, 7)) sse(res, "content_block_delta", { type: "content_block_delta", index, delta: { type: "text_delta", text: part } });
@@ -85,8 +88,9 @@ export async function startMock(script: ScriptTurn[]): Promise<MockServer> {
           for (const part of chunks(b.rawJson ?? JSON.stringify(b.input), 11))
             sse(res, "content_block_delta", { type: "content_block_delta", index, delta: { type: "input_json_delta", partial_json: part } });
         }
+        if (b.hold) await new Promise((r) => setTimeout(r, b.hold));
         sse(res, "content_block_stop", { type: "content_block_stop", index });
-      });
+      }
       sse(res, "message_delta", { type: "message_delta", delta: { stop_reason: t.stop_reason, stop_sequence: null }, usage: { output_tokens: 42 } });
       sse(res, "message_stop", { type: "message_stop" });
       res.end();

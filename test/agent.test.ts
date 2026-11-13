@@ -205,7 +205,8 @@ test("sub-agent runs with a fresh context and returns only its report", async ()
   await mock.close();
   const sub = mock.requests[1].body;
   assert.equal(sub.messages.length, 1);
-  assert.equal(sub.messages[0].content, "Count the files.");
+  // The brief, then the team section every sub-agent gets.
+  assert.match(sub.messages[0].content, /^Count the files\.\n\n# Your team\n\nYou are sub-agent ag1\./);
   assert.ok(!sub.tools.some((t: any) => t.name === "task"), "no nested sub-agents");
   assert.match(sub.system[0].text, /sub-agent of Forge/);
   const main = mock.requests[3].body;

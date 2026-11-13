@@ -20,6 +20,7 @@ export const c = {
   cyan: sgr("36", "39"),
   gray: sgr("90", "39"),
   orange: sgr("38;5;208", "39"),
+  violet: sgr("38;5;141", "39"),
   bgGray: sgr("48;5;236", "49"),
 };
 
