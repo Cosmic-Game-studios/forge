@@ -1,0 +1,40 @@
+{
+  "name": "forge-harness",
+  "version": "0.2.0-alpha",
+  "description": "Forge - a terminal coding agent that checks its own work (Anthropic, OpenRouter, OpenAI keys)",
+  "type": "module",
+  "bin": {
+    "forge": "dist/main.js"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "scripts": {
+    "build": "tsc -p .",
+    "typecheck": "tsc -p . --noEmit",
+    "start": "node dist/main.js",
+    "dev": "node src/main.ts",
+    "test": "node --test \"test/*.test.ts\""
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@xterm/headless": "^6.0.0",
+    "typescript": "latest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Cosmic-Game-studios/forge.git"
+  },
+  "keywords": [
+    "coding-agent",
+    "ai",
+    "cli",
+    "terminal",
+    "claude",
+    "agent",
+    "mcp"
+  ]
+}

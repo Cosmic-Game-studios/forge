@@ -1,0 +1,61 @@
+{
+  "model": "anthropic:claude-haiku-5-5",
+  "reps": 1,
+  "date": "2026-11-13T02:42:19.484Z",
+  "summary": {
+    "baseline": {
+      "runs": 1,
+      "passed": 1,
+      "requests": 11,
+      "tools": 10,
+      "inputTokens": 96453,
+      "outputTokens": 1504,
+      "cost": 0.003033025,
+      "seconds": 12
+    },
+    "full": {
+      "runs": 1,
+      "passed": 1,
+      "requests": 8,
+      "tools": 9,
+      "inputTokens": 66971,
+      "outputTokens": 1957,
+      "cost": 0.002984115,
+      "seconds": 14
+    }
+  },
+  "results": [
+    {
+      "task": "large-file-edit",
+      "config": "baseline",
+      "rep": 1,
+      "pass": true,
+      "why": "",
+      "exit": 0,
+      "seconds": 12,
+      "requests": 11,
+      "tools": 10,
+      "cost": 0.003033025,
+      "input": 24,
+      "output": 1504,
+      "cacheRead": 85000,
+      "cacheWrite": 11429
+    },
+    {
+      "task": "large-file-edit",
+      "config": "full",
+      "rep": 1,
+      "pass": true,
+      "why": "",
+      "exit": 0,
+      "seconds": 14,
+      "requests": 8,
+      "tools": 9,
+      "cost": 0.002984115,
+      "input": 439,
+      "output": 1957,
+      "cacheRead": 55259,
+      "cacheWrite": 11273
+    }
+  ]
+}

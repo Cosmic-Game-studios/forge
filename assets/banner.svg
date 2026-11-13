@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 380" width="1200" height="380" role="img" aria-label="Forge Coding Agent, version 0.2.0 alpha">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#14100d"/>
+      <stop offset="1" stop-color="#0b0d12"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ff7a1a" stop-opacity="0.34"/>
+      <stop offset="1" stop-color="#ff7a1a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ffd166"/>
+      <stop offset="0.55" stop-color="#ff8a2a"/>
+      <stop offset="1" stop-color="#ef4b3a"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="380" rx="22" fill="url(#bg)"/>
+  <rect x="0.75" y="0.75" width="1198.5" height="378.5" rx="21.5" fill="none" stroke="#ff8a2a" stroke-opacity="0.28" stroke-width="1.5"/>
+
+  <!-- Ember, the mascot: the same pixel flame the terminal draws -->
+  <circle cx="232" cy="196" r="190" fill="url(#glow)"/>
+  <g transform="translate(106 64)" shape-rendering="crispEdges">
+    <rect x="112" y="0" width="28" height="28" fill="#ffd166"/>
+    <rect x="84" y="28" width="84" height="28" fill="#ffd166"/>
+    <rect x="56" y="56" width="140" height="28" fill="#ff9d3c"/>
+    <rect x="28" y="84" width="196" height="84" fill="#ff8a2a"/>
+    <rect x="56" y="168" width="140" height="28" fill="#f26a2e"/>
+    <rect x="56" y="196" width="42" height="18" fill="#ef4b3a"/>
+    <rect x="154" y="196" width="42" height="18" fill="#ef4b3a"/>
+    <rect x="80" y="110" width="30" height="30" fill="#14100d"/>
+    <rect x="142" y="110" width="30" height="30" fill="#14100d"/>
+    <rect x="88" y="114" width="10" height="10" fill="#fff6e5"/>
+    <rect x="150" y="114" width="10" height="10" fill="#fff6e5"/>
+  </g>
+
+  <g font-family="ui-monospace, 'SF Mono', 'Cascadia Code', 'JetBrains Mono', Menlo, Consolas, monospace">
+    <text x="420" y="168" font-size="118" font-weight="800" letter-spacing="10" fill="url(#title)">FORGE</text>
+    <text x="424" y="222" font-size="30" fill="#f3ece4">Coding Agent</text>
+    <rect x="662" y="194" width="196" height="38" rx="19" fill="#ff8a2a" fill-opacity="0.14" stroke="#ff8a2a" stroke-opacity="0.6"/>
+    <text x="760" y="220" font-size="20" fill="#ffb066" text-anchor="middle">v0.2.0 alpha</text>
+    <text x="424" y="278" font-size="21" fill="#a39a90">A terminal coding agent that checks its own work:</text>
+    <text x="424" y="308" font-size="21" fill="#a39a90">instant feedback on every edit, an independent</text>
+    <text x="424" y="338" font-size="21" fill="#a39a90">review before "done", and eyes for UI and 3D.</text>
+  </g>
+</svg>
