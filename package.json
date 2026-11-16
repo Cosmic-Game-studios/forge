@@ -2,6 +2,7 @@
   "name": "forge-harness",
   "version": "0.2.0-alpha",
   "description": "Forge - a terminal coding agent that checks its own work (Anthropic, OpenRouter, OpenAI keys)",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "forge": "dist/main.js"
